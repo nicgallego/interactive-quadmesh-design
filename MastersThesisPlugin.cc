@@ -2,8 +2,11 @@
 #include <MeshTools/MeshSelectionT.hh>
 #include "OpenFlipper/BasePlugin/PluginFunctions.hh"
 #include <ObjectTypes/TriangleMesh/TriangleMesh.hh>
+#include <OpenMesh/Core/Utils/PropertyManager.hh>
 #include <iostream>
 #include <vector>
+
+typedef OpenMesh::TriMesh_ArrayKernelT<> MyMesh;
 
 void MastersThesisPlugin::initializePlugin() {
     tool_ = new MastersThesisToolbar();
@@ -33,11 +36,19 @@ void MastersThesisPlugin::slot_get_boundary() {
 //                std::cout << "i: " << i << std::endl;
                 // add handle to vertices so you can work with them
                 OpenMesh::VertexHandle vh = trimesh->vertex_handle(i);
+                OpenMesh::EPropHandleT<float> edge_length;
+                TriMesh::Color green = {0.0,255.0,255.0,0};
                 std::cout << "neighbouring vertices of " << vh << ": " << trimesh->point(vh) << " are:\n";
-                // find neighbouring vertices
-                for(auto vv_it = trimesh->vv_iter(vh); vv_it.is_valid(); vv_it++){
-                    std::cout  << *vv_it << ": " << trimesh->point(*vv_it) << " ||\t";
+                // find adjacent edges
+                for (TriMesh::VertexEdgeIter ve_it = trimesh->ve_iter(vh); ve_it.is_valid(); ++ve_it) {
+                    trimesh->add_property(edge_length, "edge_length");
+                    trimesh->property(edge_length,*ve_it) = trimesh->calc_edge_length(*ve_it);
+                    trimesh->request_edge_colors();
+                    trimesh->set_color(*ve_it, green);
+                    float LL = trimesh->property(edge_length, *ve_it);
+                    std::cout << *ve_it << " length is: " <<  LL << " ||\t";
                 }
+                trimesh->remove_property(edge_length);
                 std::cout << "\n=============\n";
             }
 
