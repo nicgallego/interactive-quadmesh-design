@@ -14,7 +14,7 @@ void MastersThesisPlugin::initializePlugin() {
     QSize size(300, 300);
     tool_->resize(size);
 
-    connect(tool_->get_mesh_boundaries, SIGNAL(clicked()), this, SLOT(slot_get_boundary()));
+    connect(tool_->get_vertex_selection, SIGNAL(clicked()), this, SLOT(slot_get_boundary()));
 
     emit addToolbox(tr("MastersThesis"), tool_);
 
@@ -32,8 +32,9 @@ void MastersThesisPlugin::slot_get_boundary() {
         // different creation of mesh: TriMesh *trimesh = PluginFunctions::triMesh(*o_it);
 
         if (trimesh) {
-            DijkstraDistance test{*trimesh};
-            test.colorizeEdgeSelection();
+            DijkstraDistance mesh{*trimesh};
+            mesh.colorizeEdgeSelection();
+            mesh.calculateDijkstra(tool_->dijkstra_distance->value());
 
             // change layer of display
             PluginFunctions::triMeshObject(*o_it)->meshNode()->drawMode(ACG::SceneGraph::DrawModes::EDGES_COLORED);
