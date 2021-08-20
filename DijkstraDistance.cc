@@ -4,6 +4,7 @@
 #include "DijkstraDistance.hh"
 #include <MeshTools/MeshSelectionT.hh>
 #include "OpenFlipper/BasePlugin/PluginFunctions.hh"
+#include "OpenMesh/Core/Utils/PropertyManager.hh"
 
 void DijkstraDistance::colorizeEdgeSelection() {
     BaseObjectData *object;
@@ -32,66 +33,64 @@ void DijkstraDistance::colorizeEdgeSelection() {
 }
 
 void DijkstraDistance::calculateDijkstra(const double refDist) {
-    const double infiniteDistance = DBL_MAX;
-    const double nullDistance = 0;
-    bool rmPrevElem {false};
-    double totEdgeLen;
-    // set visited status of all edges false and distance to a big number
-    for (OpenMesh::VertexHandle vh: trimesh_.vertices()) {
-        trimesh_.property(visited, vh) = false;
-        trimesh_.property(distance, vh) = infiniteDistance;
-    };
-    // get vertex selection
-    std::vector<int> selectedVertices = MeshSelection::getVertexSelection(&trimesh_);
-    std::vector<int> visVertices = selectedVertices;
+    std::vector<int> allVertices;
+    initialize(allVertices);
 
-    // set the property of the selection to vistied and distance zero
+    while (true) {
+        double totEdgeLen = 0;
+        double vertexIndex = smallestDistVertex(allVertices);
+        // if all vertices are visited the algo stops
+        if (vertexIndex == DBL_MAX)
+            break;
+        OpenMesh::VertexHandle vh = trimesh_.vertex_handle(vertexIndex);
+        trimesh_.property(visited, vh) = true;
+
+        for (auto voh_it = trimesh_.voh_iter(vh); voh_it.is_valid(); ++voh_it) {
+            OpenMesh::VertexHandle vh_neighbour = trimesh_.to_vertex_handle(*voh_it);
+            totEdgeLen = trimesh_.property(distance, vh) + trimesh_.calc_edge_length(*voh_it);
+            if (!trimesh_.property(visited, vh_neighbour) && totEdgeLen < trimesh_.property(distance, vh_neighbour))
+                trimesh_.property(distance, vh_neighbour) = totEdgeLen;
+        }
+    }
+    //testing vector to see if everything worked
+    std::vector<std::vector<double>> distVector;
+    for (OpenMesh::VertexHandle vh: trimesh_.vertices()) {
+        double dist = trimesh_.property(distance, vh);
+        distVector.push_back({(double) vh.idx(), dist});
+    };
+}
+
+double DijkstraDistance::smallestDistVertex(std::vector<int> &allVertices) {
+    double minDistance = DBL_MAX;
+    double vertex = DBL_MAX;
+    for (int i: allVertices) {
+        OpenMesh::VertexHandle vh = trimesh_.vertex_handle(i);
+        if (!trimesh_.property(visited, vh) && trimesh_.property(distance, vh) < minDistance) {
+            minDistance = trimesh_.property(distance, vh);
+            vertex = vh.idx();
+        }
+    }
+    return vertex;
+}
+
+void DijkstraDistance::initialize(std::vector<int> &allVertices) {
+    std::vector<int> selectedVertices = MeshSelection::getVertexSelection(&trimesh_);
+    const double infiniteDistance = DBL_MAX;
+    const double zeroDistance = 0;
+
+    for (OpenMesh::VertexHandle vh: trimesh_.vertices()) {
+        trimesh_.property(distance, vh) = infiniteDistance;
+        trimesh_.property(visited, vh) = false;
+    };
+
+    // set the property of the distance zero
     for (int i: selectedVertices) {
         OpenMesh::VertexHandle vh = trimesh_.vertex_handle(i);
-        trimesh_.property(distance, vh) = nullDistance;
-        trimesh_.property(visited, vh) = true;
+        trimesh_.property(distance, vh) = zeroDistance;
     }
-    while (true) {
-        for (int i: selectedVertices) {
-            OpenMesh::VertexHandle vh = trimesh_.vertex_handle(i);
 
-            //TODO: is auto replaceable with a VertexOHalfedgeIter?
-            for (auto voh_it = trimesh_.voh_iter(vh); voh_it.is_valid(); ++voh_it) {
-                OpenMesh::VertexHandle vh_next = trimesh_.to_vertex_handle(voh_it);
-                totEdgeLen = trimesh_.property(distance, vh) +
-                             trimesh_.calc_edge_length(voh_it);
-                // if not smaller, skip distance
-                if (totEdgeLen < refDist) {
-                    // if totEdgeLen is shorter than property and visited = false -> set distance = totEdgeLen and visited = true
-                    if (totEdgeLen < trimesh_.property(distance, vh_next) && !trimesh_.property(visited, vh_next)) {
-                        trimesh_.property(distance, vh_next) = totEdgeLen;
-                        trimesh_.property(visited, vh_next) = true;
-                        // not a good idea to make infinite loops!!!!!!!!!!
-                        // find workaround
-                        visVertices.push_back(vh_next.idx());
-                    }
-                    // if totEdgeLen is shorter than property and visited = true -> replace totEdgeLen
-                    if (totEdgeLen < trimesh_.property(distance, vh_next) && trimesh_.property(visited, vh_next))
-                        trimesh_.property(distance, vh_next) = totEdgeLen;
-                        visVertices.push_back(vh_next.idx());
-                }
-            }
-        }
-        // temporary
-        if (totEdgeLen > refDist)
-            break;
-
-
-    }
-    // get selection
-    // cycle through selection; set property of selected one zero
-    // create property bool visited = false
-    // create property double distance = infinite
-    // set property of all the other vertices infinite and put them in a list
-    // get edge length to next vertices; update properties to distance (sum up distance)
-    // go to next vertex and repeat for his neighbouring vertices
-    // check if distance is shorter than refDist
-    // remove the ones with visited status from list
-    std::cout << "this is the value: " << refDist << std::endl;
-
+    // create list with all vertices
+    for (auto vh: trimesh_.vertices())
+        allVertices.push_back(vh.idx());
 }
+
