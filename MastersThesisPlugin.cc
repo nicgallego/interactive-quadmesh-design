@@ -1,11 +1,5 @@
 #include "MastersThesisPlugin.hh"
-#include <MeshTools/MeshSelectionT.hh>
 #include "DijkstraDistance.hh"
-#include "OpenFlipper/BasePlugin/PluginFunctions.hh"
-#include <ObjectTypes/TriangleMesh/TriangleMesh.hh>
-#include <OpenMesh/Core/Utils/PropertyManager.hh>
-#include <iostream>
-#include <vector>
 
 typedef OpenMesh::TriMesh_ArrayKernelT<> MyMesh;
 
@@ -23,7 +17,6 @@ void MastersThesisPlugin::initializePlugin() {
 void MastersThesisPlugin::pluginsInitialized() {}
 
 void MastersThesisPlugin::slot_get_boundary() {
-
     for (PluginFunctions::ObjectIterator o_it(PluginFunctions::TARGET_OBJECTS, DATA_TRIANGLE_MESH);
          o_it != PluginFunctions::objectsEnd(); ++o_it) {
         // create mesh
@@ -33,15 +26,14 @@ void MastersThesisPlugin::slot_get_boundary() {
 
         if (trimesh) {
             DijkstraDistance mesh{*trimesh};
-            mesh.colorizeEdgeSelection();
             mesh.calculateDijkstra(tool_->dijkstra_distance->value());
+            mesh.colorizeArea(tool_->dijkstra_distance->value());
 
             // change layer of display
             PluginFunctions::triMeshObject(*o_it)->meshNode()->drawMode(ACG::SceneGraph::DrawModes::EDGES_COLORED);
             emit updatedObject(o_it->id(), UPDATE_ALL);
         }
     }
-
 }
 
 #if QT_VERSION < 0x050000

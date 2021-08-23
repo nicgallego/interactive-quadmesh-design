@@ -7,7 +7,7 @@
 #include <OpenFlipper/BasePlugin/ToolboxInterface.hh>
 #include <OpenFlipper/BasePlugin/LoggingInterface.hh>
 #include <OpenFlipper/BasePlugin/LoadSaveInterface.hh>
-
+#include <ObjectTypes/TriangleMesh/TriangleMesh.hh>
 #include "MastersThesisToolbar.hh"
 
 class MastersThesisPlugin : public QObject, BaseInterface, ToolboxInterface, LoggingInterface, LoadSaveInterface {
