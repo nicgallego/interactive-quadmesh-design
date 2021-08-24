@@ -29,8 +29,10 @@ void DijkstraDistance::colorizeArea(const double refDist) {
     }
 }
 
-void DijkstraDistance::calculateDijkstra(const double refDist) {
+std::vector<int> DijkstraDistance::calculateDijkstra(const double refDist) {
     std::vector<int> allVertices;
+    std::vector<int> verticesInRange;
+
     initialize(allVertices);
 
     while (true) {
@@ -41,6 +43,7 @@ void DijkstraDistance::calculateDijkstra(const double refDist) {
             break;
         OpenMesh::VertexHandle vh = trimesh_.vertex_handle(vertexIndex);
         trimesh_.property(visited, vh) = true;
+        verticesInRange.push_back(vh.idx());
         for (auto voh_it = trimesh_.voh_iter(vh); voh_it.is_valid(); ++voh_it) {
             OpenMesh::VertexHandle vh_neighbour = trimesh_.to_vertex_handle(*voh_it);
             totEdgeLen = trimesh_.property(distance, vh) + trimesh_.calc_edge_length(*voh_it);
@@ -48,6 +51,8 @@ void DijkstraDistance::calculateDijkstra(const double refDist) {
                 trimesh_.property(distance, vh_neighbour) = totEdgeLen;
         }
     }
+
+    return verticesInRange;
     //testing vector to see if everything worked
 //    std::vector<std::vector<double>> distVector;
 //    for (OpenMesh::VertexHandle vh: trimesh_.vertices()) {

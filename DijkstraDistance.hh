@@ -31,7 +31,9 @@ public:
 
     void colorizeArea(const double refDist);
 
-    void calculateDijkstra(const double refDist);
+    std::vector<int> calculateDijkstra(const double refDist);
+
+    void getVerticesInRange(const double refDist);
 
 private:
     TriMesh &trimesh_;
