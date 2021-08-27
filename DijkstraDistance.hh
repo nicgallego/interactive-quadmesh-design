@@ -42,9 +42,14 @@ private:
     OpenMesh::VPropHandleT<double> distance;
     OpenMesh::VPropHandleT<bool> visited;
 
-    void initialize(std::vector<int> &allVertices);
+    void initializeDistanceProperty(std::vector<int> &allVertices);
 
     double getSmallestDistPropVertex(std::vector<int> &allVertices, const double refDist);
+
+    void initializeSelectedVertices(std::vector<int> &selectedVertices, const double zeroDistance);
+    void initializeSelectedEdges(std::vector<int> &selectedEdges, const double zeroDistance);
+    void initializeSelectedHEdges(std::vector<int> &selectedHEdges, const double zeroDistance);
+    void initializeSelectedFaces(std::vector<int> &selectedFaces, const double zeroDistance);
 };
 
 

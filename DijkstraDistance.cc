@@ -1,10 +1,5 @@
 #include "DijkstraDistance.hh"
 
-//bool sortcol(const std::vector<double> &v1,
-//             const std::vector<double> &v2) {
-//    return v1[1] < v2[1];
-//}
-
 void DijkstraDistance::colorizeArea(const double refDist) {
     BaseObjectData *object;
     // define colors
@@ -33,7 +28,7 @@ std::vector<int> DijkstraDistance::calculateDijkstra(const double refDist) {
     std::vector<int> allVertices;
     std::vector<int> verticesInRange;
 
-    initialize(allVertices);
+    initializeDistanceProperty(allVertices);
 
     while (true) {
         double totEdgeLen = 0;
@@ -51,31 +46,10 @@ std::vector<int> DijkstraDistance::calculateDijkstra(const double refDist) {
                 trimesh_.property(distance, vh_neighbour) = totEdgeLen;
         }
     }
-
     return verticesInRange;
-    //testing vector to see if everything worked
-//    std::vector<std::vector<double>> distVector;
-//    for (OpenMesh::VertexHandle vh: trimesh_.vertices()) {
-//        double dist = trimesh_.property(distance, vh);
-//        distVector.push_back({(double) vh.idx(), dist});
-//    };
-//    std::vector<std::vector<double>> vertexProperties;
-//
-//    for (OpenMesh::VertexHandle vh: trimesh_.vertices()) {
-//        vertexProperties.push_back({(double) vh.idx(), trimesh_.property(distance, vh)});
-//    };
-//
-//    std::sort(vertexProperties.begin(), vertexProperties.end(), sortcol);
-//
-//    for (int i = 0; i < (int) vertexProperties.size(); ++i) {
-//        for (int j = 0; j < 2; ++j)
-//            std::cout << vertexProperties[i][j] << " ";
-//        std::cout << std::endl;
-//    }
-//    std::cout << "==============================\n";
-
 }
 
+// check every vertex and return vertex with the smallest "distance" property which is still unvisited
 double DijkstraDistance::getSmallestDistPropVertex(std::vector<int> &allVertices, const double refDist) {
     double minDistance = DBL_MAX;
     double anyVertex = DBL_MAX;
@@ -91,23 +65,73 @@ double DijkstraDistance::getSmallestDistPropVertex(std::vector<int> &allVertices
     return anyVertex;
 }
 
-void DijkstraDistance::initialize(std::vector<int> &allVertices) {
+void DijkstraDistance::initializeDistanceProperty(std::vector<int> &allVertices) {
     std::vector<int> selectedVertices = MeshSelection::getVertexSelection(&trimesh_);
+    std::vector<int> selectedEdges = MeshSelection::getEdgeSelection(&trimesh_);
+    std::vector<int> selectedHEdges = MeshSelection::getHalfedgeSelection(&trimesh_);
+    std::vector<int> selectedFaces = MeshSelection::getFaceSelection(&trimesh_);
     const double infiniteDistance = DBL_MAX;
     const double zeroDistance = 0;
+
+    // give all vertices the property "distance" with infiniteDistance
     for (OpenMesh::VertexHandle vh: trimesh_.vertices()) {
         trimesh_.property(distance, vh) = infiniteDistance;
         trimesh_.property(visited, vh) = false;
     };
+    if (!selectedVertices.empty())
+        initializeSelectedVertices(selectedVertices, zeroDistance);
 
-    // set the property of the distance zero
-    for (int i: selectedVertices) {
-        OpenMesh::VertexHandle vh = trimesh_.vertex_handle(i);
-        trimesh_.property(distance, vh) = zeroDistance;
-    }
+    if (!selectedEdges.empty())
+        initializeSelectedEdges(selectedEdges, zeroDistance);
+
+    if (!selectedHEdges.empty())
+        initializeSelectedHEdges(selectedHEdges, zeroDistance);
+
+    if (!selectedFaces.empty())
+        initializeSelectedFaces(selectedFaces, zeroDistance);
+
 
     // create list with all vertices
     for (auto vh: trimesh_.vertices())
         allVertices.push_back(vh.idx());
 }
 
+// sets vertex property distance to zero
+void DijkstraDistance::initializeSelectedVertices(std::vector<int> &selectedVertices, const double zeroDistance) {
+    // set the property of the distance zero
+    for (int i: selectedVertices) {
+        OpenMesh::VertexHandle vh = trimesh_.vertex_handle(i);
+        trimesh_.property(distance, vh) = zeroDistance;
+    }
+}
+
+// sets the property "distance" on both adjacent vertices of the selected edges to zero
+void DijkstraDistance::initializeSelectedEdges(std::vector<int> &selectedEdges, const double zeroDistance) {
+    for (int i: selectedEdges) {
+        OpenMesh::EdgeHandle eh = trimesh_.edge_handle(i);
+        OpenMesh::VertexHandle vh1 = trimesh_.to_vertex_handle(trimesh_.halfedge_handle(eh, 0));
+        OpenMesh::VertexHandle vh2 = trimesh_.from_vertex_handle(trimesh_.halfedge_handle(eh, 0));
+        trimesh_.property(distance, vh1) = zeroDistance;
+        trimesh_.property(distance, vh2) = zeroDistance;
+    }
+}
+
+// sets the property "distance" on both adjacent vertices of the selected halfedges to zero
+void DijkstraDistance::initializeSelectedHEdges(std::vector<int> &selectedHEdges, const double zeroDistance) {
+    for (int i: selectedHEdges) {
+        OpenMesh::VertexHandle vh1 = trimesh_.to_vertex_handle(trimesh_.halfedge_handle(i));
+        OpenMesh::VertexHandle vh2 = trimesh_.from_vertex_handle(trimesh_.halfedge_handle(i));
+        trimesh_.property(distance, vh1) = zeroDistance;
+        trimesh_.property(distance, vh2) = zeroDistance;
+    }
+}
+
+// sets the property "distance" on all adjacent vertices of the selected faces to zero
+void DijkstraDistance::initializeSelectedFaces(std::vector<int> &selectedFaces, const double zeroDistance) {
+    for (int i: selectedFaces) {
+        OpenMesh::FaceHandle fh = trimesh_.face_handle(i);
+        for (auto fv_it = trimesh_.fv_iter(fh); fv_it.is_valid(); fv_it++) {
+            trimesh_.property(distance, *fv_it) = zeroDistance;
+        }
+    }
+}
