@@ -55,6 +55,7 @@ public :
 public slots:
 
     void slot_get_boundary();
+    void slot_get_dualGraph();
 
 private:
     MastersThesisToolbar *tool_;
