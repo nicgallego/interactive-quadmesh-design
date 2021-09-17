@@ -31,7 +31,9 @@ void MastersThesisPlugin::slot_get_boundary() {
         if (trimesh) {
             DijkstraDistance mesh{*trimesh};
             verticesInRange = mesh.calculateDijkstra(refDist);
-            mesh.colorizeArea(refDist);
+            //TODO: add checkbox in UI to have a choice
+            mesh.includeBoundaryFaces(verticesInRange, refDist);
+            mesh.colorizeArea(refDist, verticesInRange);
             // change layer of display
             PluginFunctions::triMeshObject(*o_it)->meshNode()->drawMode(ACG::SceneGraph::DrawModes::EDGES_COLORED);
             emit updatedObject(o_it->id(), UPDATE_ALL);

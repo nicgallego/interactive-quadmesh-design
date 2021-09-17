@@ -8,6 +8,7 @@
 #include <iostream>
 #include <vector>
 #include <float.h>
+#include <algorithm>
 
 
 class DijkstraDistance {
@@ -29,11 +30,11 @@ public:
 
 public:
 
-    void colorizeArea(const double refDist);
+    void colorizeArea(const double refDist, std::vector<int> &verticesInRange);
 
     std::vector<int> calculateDijkstra(const double refDist);
 
-    void getVerticesInRange(const double refDist);
+    void includeBoundaryFaces(std::vector<int> &verticesInRange, const double refDist);
 
 private:
     TriMesh &trimesh_;
@@ -42,13 +43,16 @@ private:
     OpenMesh::VPropHandleT<double> distance;
     OpenMesh::VPropHandleT<bool> visited;
 
-    void initializeDistanceProperty(std::vector<int> &allVertices);
-
     double getSmallestDistPropVertex(std::vector<int> &allVertices, const double refDist);
 
+    void initializeDistanceProperty(std::vector<int> &allVertices);
+
     void initializeSelectedVertices(std::vector<int> &selectedVertices, const double zeroDistance);
+
     void initializeSelectedEdges(std::vector<int> &selectedEdges, const double zeroDistance);
+
     void initializeSelectedHEdges(std::vector<int> &selectedHEdges, const double zeroDistance);
+
     void initializeSelectedFaces(std::vector<int> &selectedFaces, const double zeroDistance);
 };
 

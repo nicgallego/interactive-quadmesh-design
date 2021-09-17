@@ -1,24 +1,29 @@
 #include "DijkstraDistance.hh"
 
-void DijkstraDistance::colorizeArea(const double refDist) {
+void DijkstraDistance::colorizeArea(const double refDist, std::vector<int> &verticesInRange) {
     BaseObjectData *object;
     // define colors
     TriMesh::Color babyblue = {0, 123, 123, 255};
     TriMesh::Color white = {255, 255, 255, 255};
+    TriMesh::Color green = {0, 255, 0, 255};
     // colorize all edges white
     for (OpenMesh::EdgeHandle eh: trimesh_.edges()) {
         // write to the property
         trimesh_.property(edge_color, eh);
         trimesh_.set_color(eh, white);
     }
-    // colorize edges where vertices have a smaller distance than the refDist
-    for (OpenMesh::VertexHandle vh: trimesh_.vertices()) {
-        if (trimesh_.property(distance, vh) < refDist) {
-            for (auto voh_it = trimesh_.voh_iter(vh); voh_it.is_valid(); ++voh_it) {
-                OpenMesh::VertexHandle vh_neighbour = trimesh_.to_vertex_handle(*voh_it);
-                if (trimesh_.property(distance, vh_neighbour) < refDist) {
-                    trimesh_.set_color(trimesh_.edge_handle(*voh_it), babyblue);
-                }
+
+    // colorize edges where vertices have a smaller distance than the refDist blue
+    // and edges where the refDist is bigger but some vertices of the face are smaller than refDist green
+    for (int i: verticesInRange) {
+        OpenMesh::VertexHandle vh = trimesh_.vertex_handle(i);
+        for (auto voh_it = trimesh_.voh_iter(vh); voh_it.is_valid(); ++voh_it) {
+            OpenMesh::VertexHandle vh_neighbour = trimesh_.to_vertex_handle(*voh_it);
+            if (trimesh_.property(distance, vh) < refDist &&
+                trimesh_.property(distance, vh_neighbour) < refDist) {
+                trimesh_.set_color(trimesh_.edge_handle(*voh_it), babyblue);
+            } else if (trimesh_.property(distance, vh_neighbour) < DBL_MAX) {
+                trimesh_.set_color(trimesh_.edge_handle(*voh_it), green);
             }
         }
     }
@@ -63,6 +68,36 @@ double DijkstraDistance::getSmallestDistPropVertex(std::vector<int> &allVertices
         }
     }
     return anyVertex;
+}
+
+/*
+ * if some face has a vertex that is smaller than the refDist, face gets added to the vertices in Range
+ */
+void DijkstraDistance::includeBoundaryFaces(std::vector<int> &verticesInRange, const double refDist) {
+    std::vector<int> tempVertices;
+    for (int i: verticesInRange) {
+        OpenMesh::VertexHandle vh = trimesh_.vertex_handle(i);
+        for (auto voh_it = trimesh_.voh_iter(vh); voh_it.is_valid(); ++voh_it) {
+            OpenMesh::VertexHandle vh_neighbour = trimesh_.to_vertex_handle(*voh_it);
+            if (trimesh_.property(distance, vh_neighbour) != DBL_MAX &&
+                trimesh_.property(distance, vh_neighbour) >= refDist) {
+                auto fh = trimesh_.face_handle(*voh_it);
+                for (auto fv_it = trimesh_.fv_iter(fh); fv_it.is_valid(); ++fv_it)
+                    tempVertices.push_back(fv_it->idx());
+            }
+        }
+    }
+    //erase duplicates
+    std::set<int> s;
+    unsigned size = tempVertices.size();
+    for (unsigned i = 0; i < size; ++i) s.insert(tempVertices[i]);
+    tempVertices.assign(s.begin(), s.end());
+    //add to vertices in range
+    for (int i: tempVertices) {
+        if (std::find(verticesInRange.begin(), verticesInRange.end(), i) ==
+            verticesInRange.end())
+            verticesInRange.push_back(i);
+    }
 }
 
 void DijkstraDistance::initializeDistanceProperty(std::vector<int> &allVertices) {
