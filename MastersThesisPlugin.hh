@@ -59,6 +59,10 @@ public slots:
 
 private:
     MastersThesisToolbar *tool_;
+
+    //store selected vertices
+    std::vector<int> constrained_vertices;
+
 };
 
 #endif //OPENFLIPPER_MASTERSTHESISPLUGIN_H

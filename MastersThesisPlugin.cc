@@ -1,6 +1,6 @@
 #include "MastersThesisPlugin.hh"
 #include "DijkstraDistance.hh"
-#include "DualGraph.hh"
+#include "Crossfield.hh"
 
 typedef OpenMesh::TriMesh_ArrayKernelT<> MyMesh;
 
@@ -21,7 +21,6 @@ void MastersThesisPlugin::pluginsInitialized() {}
 void MastersThesisPlugin::slot_get_boundary() {
     const double refDist = tool_->dijkstra_distance->value();
     const bool inclBoundaryF = tool_->include_boundary_faces->isChecked();
-    std::vector<int> verticesInRange;
     for (PluginFunctions::ObjectIterator o_it(PluginFunctions::TARGET_OBJECTS, DATA_TRIANGLE_MESH);
          o_it != PluginFunctions::objectsEnd(); ++o_it) {
         // create mesh
@@ -31,15 +30,16 @@ void MastersThesisPlugin::slot_get_boundary() {
 
         if (trimesh) {
             DijkstraDistance mesh{*trimesh};
-            verticesInRange = mesh.calculateDijkstra(refDist);
+            constrained_vertices = mesh.calculateDijkstra(refDist);
             if (inclBoundaryF)
-                mesh.includeBoundaryFaces(verticesInRange, refDist);
-            mesh.colorizeArea(refDist, verticesInRange, inclBoundaryF);
+                mesh.includeBoundaryFaces(constrained_vertices, refDist);
+            mesh.colorizeArea(refDist, constrained_vertices, inclBoundaryF);
             // change layer of display
             PluginFunctions::triMeshObject(*o_it)->meshNode()->drawMode(ACG::SceneGraph::DrawModes::EDGES_COLORED);
             emit updatedObject(o_it->id(), UPDATE_ALL);
         }
     }
+
 }
 
 void MastersThesisPlugin::slot_get_dualGraph() {
@@ -49,7 +49,8 @@ void MastersThesisPlugin::slot_get_dualGraph() {
         TriMeshObject *tri_obj = PluginFunctions::triMeshObject(*o_it);
         TriMesh *trimesh = tri_obj->mesh();
         if (trimesh) {
-            DualGraph mesh{*trimesh};
+            Crossfield mesh{*trimesh};
+            mesh.getCrossfield();
         }
     }
 }
