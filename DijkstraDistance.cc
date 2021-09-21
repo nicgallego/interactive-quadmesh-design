@@ -1,6 +1,7 @@
 #include "DijkstraDistance.hh"
 
-void DijkstraDistance::colorizeArea(const double refDist, std::vector<int> &verticesInRange) {
+void DijkstraDistance::colorizeArea(const double refDist, std::vector<int> &verticesInRange,
+                                    const bool includeBoundaryFaces) {
     BaseObjectData *object;
     // define colors
     TriMesh::Color babyblue = {0, 123, 123, 255};
@@ -22,7 +23,7 @@ void DijkstraDistance::colorizeArea(const double refDist, std::vector<int> &vert
             if (trimesh_.property(distance, vh) < refDist &&
                 trimesh_.property(distance, vh_neighbour) < refDist) {
                 trimesh_.set_color(trimesh_.edge_handle(*voh_it), babyblue);
-            } else if (trimesh_.property(distance, vh_neighbour) < DBL_MAX) {
+            } else if (trimesh_.property(distance, vh_neighbour) < DBL_MAX && includeBoundaryFaces) {
                 trimesh_.set_color(trimesh_.edge_handle(*voh_it), green);
             }
         }
