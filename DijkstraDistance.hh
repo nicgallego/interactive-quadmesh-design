@@ -30,11 +30,15 @@ public:
 
 public:
 
-    void colorizeArea(const double refDist, std::vector<int> &verticesInRange, const bool inclBoundaryFaces);
 
     std::vector<int> calculateDijkstra(const double refDist);
 
     void includeBoundaryFaces(std::vector<int> &verticesInRange, const double refDist);
+
+    std::vector<int>
+    getHEinRange(const std::vector<int> &verticesInRange, const double refDist, const bool inclBoundaryF);
+
+    void colorizeArea(const std::vector<int> &heInRange);
 
 private:
     TriMesh &trimesh_;

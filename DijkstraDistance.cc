@@ -1,35 +1,5 @@
 #include "DijkstraDistance.hh"
 
-void DijkstraDistance::colorizeArea(const double refDist, std::vector<int> &verticesInRange,
-                                    const bool includeBoundaryFaces) {
-    BaseObjectData *object;
-    // define colors
-    TriMesh::Color babyblue = {0, 123, 123, 255};
-    TriMesh::Color white = {255, 255, 255, 255};
-    TriMesh::Color green = {0, 255, 0, 255};
-    // colorize all edges white
-    for (OpenMesh::EdgeHandle eh: trimesh_.edges()) {
-        // write to the property
-        trimesh_.property(edge_color, eh);
-        trimesh_.set_color(eh, white);
-    }
-
-    // colorize edges where vertices have a smaller distance than the refDist blue
-    // and edges where the refDist is bigger but some vertices of the face are smaller than refDist green
-    for (int i: verticesInRange) {
-        OpenMesh::VertexHandle vh = trimesh_.vertex_handle(i);
-        for (auto voh_it = trimesh_.voh_iter(vh); voh_it.is_valid(); ++voh_it) {
-            OpenMesh::VertexHandle vh_neighbour = trimesh_.to_vertex_handle(*voh_it);
-            if (trimesh_.property(distance, vh) < refDist &&
-                trimesh_.property(distance, vh_neighbour) < refDist) {
-                trimesh_.set_color(trimesh_.edge_handle(*voh_it), babyblue);
-            } else if (trimesh_.property(distance, vh_neighbour) < DBL_MAX && includeBoundaryFaces) {
-                trimesh_.set_color(trimesh_.edge_handle(*voh_it), green);
-            }
-        }
-    }
-}
-
 std::vector<int> DijkstraDistance::calculateDijkstra(const double refDist) {
     std::vector<int> allVertices;
     std::vector<int> verticesInRange;
@@ -55,21 +25,6 @@ std::vector<int> DijkstraDistance::calculateDijkstra(const double refDist) {
     return verticesInRange;
 }
 
-// check every vertex and return vertex with the smallest "distance" property which is still unvisited
-double DijkstraDistance::getSmallestDistPropVertex(std::vector<int> &allVertices, const double refDist) {
-    double minDistance = DBL_MAX;
-    double anyVertex = DBL_MAX;
-    for (int i: allVertices) {
-        OpenMesh::VertexHandle vh = trimesh_.vertex_handle(i);
-        if (!trimesh_.property(visited, vh) &&
-            trimesh_.property(distance, vh) < minDistance &&
-            trimesh_.property(distance, vh) < refDist) {
-            minDistance = trimesh_.property(distance, vh);
-            anyVertex = vh.idx();
-        }
-    }
-    return anyVertex;
-}
 
 /*
  * if some face has a vertex that is smaller than the refDist, face gets added to the vertices in Range
@@ -100,6 +55,63 @@ void DijkstraDistance::includeBoundaryFaces(std::vector<int> &verticesInRange, c
             verticesInRange.push_back(i);
     }
 }
+
+/*
+ * gets all halfedges in the range. can be used to create a crossfield
+ */
+std::vector<int> DijkstraDistance::getHEinRange(const std::vector<int> &verticesInRange, const double refDist,
+                                                const bool inclBoundaryF) {
+    std::vector<int> heInRange;
+    for (int i: verticesInRange) {
+        OpenMesh::VertexHandle vh = trimesh_.vertex_handle(i);
+        for (auto voh_it = trimesh_.voh_iter(vh); voh_it.is_valid(); ++voh_it) {
+            OpenMesh::VertexHandle vh_neighbour = trimesh_.to_vertex_handle(*voh_it);
+            if (trimesh_.property(distance, vh) < refDist &&
+                trimesh_.property(distance, vh_neighbour) < refDist) {
+                heInRange.push_back(voh_it->idx());
+            } else if (trimesh_.property(distance, vh_neighbour) < DBL_MAX && inclBoundaryF)
+                heInRange.push_back(voh_it->idx());
+        }
+    }
+    return heInRange;
+}
+
+void DijkstraDistance::colorizeArea(const std::vector<int> &heInRange) {
+    BaseObjectData *object;
+    // define colors
+    TriMesh::Color babyblue = {0, 123, 123, 255};
+    TriMesh::Color white = {255, 255, 255, 255};
+    // colorize all edges white
+    for (OpenMesh::EdgeHandle eh: trimesh_.edges()) {
+        // write to the property
+        trimesh_.property(edge_color, eh);
+        trimesh_.set_color(eh, white);
+    }
+
+    // colorize edges where vertices have a smaller distance than the refDist blue
+    // and edges where the refDist is bigger but some vertices of the face are smaller than refDist green
+    for (int i: heInRange) {
+        OpenMesh::HalfedgeHandle ehh = trimesh_.halfedge_handle(i);
+        trimesh_.set_color(trimesh_.edge_handle(ehh), babyblue);
+    }
+}
+
+// check every vertex and return vertex with the smallest "distance" property which is still unvisited
+double DijkstraDistance::getSmallestDistPropVertex(std::vector<int> &allVertices, const double refDist) {
+    double minDistance = DBL_MAX;
+    double anyVertex = DBL_MAX;
+    for (int i: allVertices) {
+        OpenMesh::VertexHandle vh = trimesh_.vertex_handle(i);
+        if (!trimesh_.property(visited, vh) &&
+            trimesh_.property(distance, vh) < minDistance &&
+            trimesh_.property(distance, vh) < refDist) {
+            minDistance = trimesh_.property(distance, vh);
+            anyVertex = vh.idx();
+        }
+    }
+    return anyVertex;
+}
+
 
 void DijkstraDistance::initializeDistanceProperty(std::vector<int> &allVertices) {
     std::vector<int> selectedVertices = MeshSelection::getVertexSelection(&trimesh_);

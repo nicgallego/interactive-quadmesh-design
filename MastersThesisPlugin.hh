@@ -11,7 +11,7 @@
 #include "MastersThesisToolbar.hh"
 
 class MastersThesisPlugin : public QObject, BaseInterface, ToolboxInterface, LoggingInterface, LoadSaveInterface {
-    Q_OBJECT
+Q_OBJECT
     Q_INTERFACES(BaseInterface)
     Q_INTERFACES(ToolboxInterface)
     Q_INTERFACES(LoggingInterface)
@@ -31,7 +31,7 @@ signals:
     void log(QString _message);
 
     // ToolboxInterface
-    void addToolbox(QString _name, QWidget* _widget);
+    void addToolbox(QString _name, QWidget *_widget);
 
     // LoadSaveInterface
     void addEmptyObject(DataType _type, int &_id);
@@ -49,12 +49,15 @@ private slots:
 public :
 
     ~MastersThesisPlugin() {}
+
     QString name() { return QString("Simple plugin"); };
+
     QString description() { return QString("Does actually nothing but works!"); };
 
 public slots:
 
     void slot_get_boundary();
+
     void slot_get_dualGraph();
 
 private:
@@ -62,6 +65,7 @@ private:
 
     //store selected vertices
     std::vector<int> constrained_vertices;
+    std::vector<int> constrained_HEdges;
 
 };
 
