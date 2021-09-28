@@ -36,7 +36,8 @@ void DijkstraDistance::includeBoundaryFaces(std::vector<int> &verticesInRange, c
         for (auto voh_it = trimesh_.voh_iter(vh); voh_it.is_valid(); ++voh_it) {
             OpenMesh::VertexHandle vh_neighbour = trimesh_.to_vertex_handle(*voh_it);
             if (trimesh_.property(distance, vh_neighbour) != DBL_MAX &&
-                trimesh_.property(distance, vh_neighbour) >= refDist) {
+                trimesh_.property(distance, vh_neighbour) >= refDist &&
+                !voh_it->is_boundary()) {
                 auto fh = trimesh_.face_handle(*voh_it);
                 for (auto fv_it = trimesh_.fv_iter(fh); fv_it.is_valid(); ++fv_it)
                     tempVertices.push_back(fv_it->idx());
@@ -76,11 +77,10 @@ std::vector<int> DijkstraDistance::getHEinRange(const std::vector<int> &vertices
     return heInRange;
 }
 
-void DijkstraDistance::colorizeArea(const std::vector<int> &heInRange) {
-    BaseObjectData *object;
+void DijkstraDistance::colorizeEdges(const std::vector<int> &heInRange) {
     // define colors
-    TriMesh::Color babyblue = {0, 123, 123, 255};
-    TriMesh::Color white = {255, 255, 255, 255};
+    TriMesh::Color green = {0, 1, 0, 1};
+    TriMesh::Color white = {1, 1, 1, 1};
     // colorize all edges white
     for (OpenMesh::EdgeHandle eh: trimesh_.edges()) {
         // write to the property
@@ -92,7 +92,7 @@ void DijkstraDistance::colorizeArea(const std::vector<int> &heInRange) {
     // and edges where the refDist is bigger but some vertices of the face are smaller than refDist green
     for (int i: heInRange) {
         OpenMesh::HalfedgeHandle ehh = trimesh_.halfedge_handle(i);
-        trimesh_.set_color(trimesh_.edge_handle(ehh), babyblue);
+        trimesh_.set_color(trimesh_.edge_handle(ehh), green);
     }
 }
 

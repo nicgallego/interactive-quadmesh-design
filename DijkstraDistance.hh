@@ -38,7 +38,7 @@ public:
     std::vector<int>
     getHEinRange(const std::vector<int> &verticesInRange, const double refDist, const bool inclBoundaryF);
 
-    void colorizeArea(const std::vector<int> &heInRange);
+    void colorizeEdges(const std::vector<int> &heInRange);
 
 private:
     TriMesh &trimesh_;

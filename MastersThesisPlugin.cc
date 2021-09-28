@@ -34,7 +34,7 @@ void MastersThesisPlugin::slot_get_boundary() {
             if (inclBoundaryF)
                 mesh.includeBoundaryFaces(constrained_vertices, refDist);
             constrained_HEdges = mesh.getHEinRange(constrained_vertices, refDist, inclBoundaryF);
-            mesh.colorizeArea(constrained_HEdges);
+            mesh.colorizeEdges(constrained_HEdges);
             // change layer of display
             PluginFunctions::triMeshObject(*o_it)->meshNode()->drawMode(ACG::SceneGraph::DrawModes::EDGES_COLORED);
             emit updatedObject(o_it->id(), UPDATE_ALL);
@@ -52,6 +52,7 @@ void MastersThesisPlugin::slot_get_dualGraph() {
         if (trimesh) {
             Crossfield mesh{*trimesh, constrained_HEdges};
             mesh.getCrossfield();
+            PluginFunctions::triMeshObject(*o_it)->meshNode()->drawMode(ACG::SceneGraph::DrawModes::SOLID_FACES_COLORED);
             emit updatedObject(o_it->id(), UPDATE_ALL);
         }
     }
