@@ -11,6 +11,7 @@
 #include <OpenMesh/Core/IO/MeshIO.hh>
 #include <MeshTools/MeshSelectionT.hh>
 #include <ACG/Geometry/Types/PlaneT.hh>
+#include <ACG/Utils/ColorCoder.hh>
 #include <iostream>
 #include <vector>
 #include <float.h>
@@ -27,15 +28,17 @@ public:
      */
     Crossfield(TriMesh &trimesh, std::vector<int> &heInRange)
             : trimesh_{trimesh}, heInRange_{heInRange} {
-        trimesh.add_property(inUse, "Edge already associated with a Face");
+        trimesh.add_property(associatedFace, "Edge already associated with a Face");
+        trimesh.add_property(face_color, "halfedge color");
         trimesh.add_property(barycenter, "Barycenter of each Face");
-        trimesh.add_property(associated_edge_to_face, "Edge associated with face, used for local coord sys");
+        trimesh.add_property(reference_edge, "Edge associated with face, used for local coord sys");
     }
 
     ~Crossfield() {
-        trimesh_.remove_property(inUse);
+        trimesh_.remove_property(associatedFace);
+        trimesh_.remove_property(face_color);
         trimesh_.remove_property(barycenter);
-        trimesh_.remove_property(associated_edge_to_face);
+        trimesh_.remove_property(reference_edge);
     }
 
 public:
@@ -50,14 +53,14 @@ private:
 
     void setlocalCoordFrame();
 
-    void getBaryCenter(std::vector<Point> &barycenters);
+    void getBaryCenterAndRefEdge(std::vector<Point> &barycenters);
 
     void getConstraints(std::vector<int> &constraints);
 
-
-    OpenMesh::FPropHandleT<OpenMesh::EdgeHandle> associated_edge_to_face;
+    OpenMesh::FPropHandleT<TriMesh::Color> face_color;
+    OpenMesh::FPropHandleT<Point> reference_edge;
     OpenMesh::FPropHandleT<Point> barycenter;
-    OpenMesh::EPropHandleT<bool> inUse;
+    OpenMesh::EPropHandleT<bool> associatedFace;
 
     TriMesh &trimesh_;
     std::vector<int> &heInRange_;
