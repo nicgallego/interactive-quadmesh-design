@@ -4,6 +4,7 @@
 
 #include "Crossfield.hh"
 
+
 void Crossfield::getCrossfield() {
     createCrossfields();
 }
@@ -13,11 +14,48 @@ void Crossfield::createCrossfields() {
 }
 
 void Crossfield::setlocalCoordFrame() {
-    std::vector<Point> barycenters;
-    getBaryCenterAndRefEdge(barycenters);
+    // 4 works for vlr 55 works for hr file
+    int shrinkingFactor = 4;
+    std::vector<int> faces;
+    getBaryCenterAndRefEdge(faces);
+
+    for (int i: faces) {
+        OpenMesh::VertexHandle vhandle[5];
+        std::vector<OpenMesh::VertexHandle> face_handles;
+        OpenMesh::FaceHandle fh = trimesh_.face_handle(i);
+        Point x_scale = trimesh_.property(reference_edge, fh);
+        Point x_scale_n = x_scale.normalize();
+        Point x_scale_from_bary_p = trimesh_.property(barycenter, fh) + x_scale_n / shrinkingFactor;
+        Point x_scale_from_bary_m = trimesh_.property(barycenter, fh) - x_scale_n / shrinkingFactor;
+
+        Point face_n = trimesh_.calc_face_normal(fh).normalize();
+        Point y_scale = OpenMesh::cross(x_scale_n, face_n);
+        Point y_scale_n = y_scale.normalize();
+        Point y_scale_from_bary_p = trimesh_.property(barycenter, fh) + y_scale_n / shrinkingFactor;
+        Point y_scale_from_bary_n = trimesh_.property(barycenter, fh) - y_scale_n / shrinkingFactor;
+
+        vhandle[0] = trimesh_.add_vertex(trimesh_.property(barycenter, fh));
+        vhandle[1] = trimesh_.add_vertex(x_scale_from_bary_p);
+        vhandle[2] = trimesh_.add_vertex((x_scale_from_bary_m));
+        vhandle[3] = trimesh_.add_vertex(y_scale_from_bary_p);
+        vhandle[4] = trimesh_.add_vertex((y_scale_from_bary_n));
+
+        // create x axis
+        face_handles.clear();
+        face_handles.push_back(vhandle[1]);
+        face_handles.push_back(vhandle[0]);
+        face_handles.push_back(vhandle[2]);
+        trimesh_.add_face(face_handles);
+        //create y axis
+        face_handles.clear();
+        face_handles.push_back(vhandle[3]);
+        face_handles.push_back(vhandle[0]);
+        face_handles.push_back(vhandle[4]);
+        trimesh_.add_face(face_handles);
+    }
 }
 
-void Crossfield::getBaryCenterAndRefEdge(std::vector<Point> &barycenters) {
+void Crossfield::getBaryCenterAndRefEdge(std::vector<int> &faces) {
     // status needs to be released before using, in case it still has saved some stuff from before
     trimesh_.release_halfedge_status();
     trimesh_.release_face_status();
@@ -29,7 +67,7 @@ void Crossfield::getBaryCenterAndRefEdge(std::vector<Point> &barycenters) {
 
     // assign constraint edges to their faces
     for (int i: constraints) {
-        Point bCenter;
+        Point bCenter = {0, 0, 0};
         int valence = 0;
         OpenMesh::EdgeHandle eh = trimesh_.edge_handle(i);
         // get random halfedge
@@ -41,19 +79,20 @@ void Crossfield::getBaryCenterAndRefEdge(std::vector<Point> &barycenters) {
             bCenter += trimesh_.point(*fv_it);
             ++valence;
         }
-        barycenters.push_back(bCenter / valence);
         // add barycenter to face
         trimesh_.property(barycenter, fh) = (bCenter / valence);
         // add reference edge to face
         trimesh_.property(reference_edge, fh) = trimesh_.calc_edge_vector(heh);
         // set face and edge as used
         trimesh_.status(heh).set_tagged(true);
+        trimesh_.status(trimesh_.opposite_halfedge_handle(heh)).set_tagged(true);
         trimesh_.status(fh).set_tagged(true);
+        faces.push_back(fh.idx());
     }
 
     // assign reference edges in range to faces
     for (int i: heInRange_) {
-        Point bCenter;
+        Point bCenter = {0, 0, 0};
         int valence = 0;
         OpenMesh::HalfedgeHandle heh = trimesh_.halfedge_handle(i);
         if (trimesh_.is_boundary(heh))
@@ -68,11 +107,13 @@ void Crossfield::getBaryCenterAndRefEdge(std::vector<Point> &barycenters) {
                 bCenter += trimesh_.point(*fv_it);
                 ++valence;
             }
-            barycenters.push_back(bCenter / valence);
             trimesh_.property(barycenter, fh) = (bCenter / valence);
             trimesh_.property(reference_edge, fh) = trimesh_.calc_edge_vector(heh);
+            // both halfedges need to be tagged, else it is possible opposite faces share an edge
             trimesh_.status(heh).set_tagged(true);
+            trimesh_.status(trimesh_.opposite_halfedge_handle(heh)).set_tagged(true);
             trimesh_.status(fh).set_tagged(true);
+            faces.push_back(fh.idx());
         }
     }
 }

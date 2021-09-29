@@ -53,7 +53,7 @@ private:
 
     void setlocalCoordFrame();
 
-    void getBaryCenterAndRefEdge(std::vector<Point> &barycenters);
+    void getBaryCenterAndRefEdge(std::vector<int> &faces);
 
     void getConstraints(std::vector<int> &constraints);
 
@@ -64,7 +64,7 @@ private:
 
     TriMesh &trimesh_;
     std::vector<int> &heInRange_;
-    PolyMesh dualGraph_;
+    PolyMesh *dualGraph_;
 };
 
 

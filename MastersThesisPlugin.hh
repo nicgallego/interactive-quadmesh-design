@@ -8,6 +8,7 @@
 #include <OpenFlipper/BasePlugin/LoggingInterface.hh>
 #include <OpenFlipper/BasePlugin/LoadSaveInterface.hh>
 #include <ObjectTypes/TriangleMesh/TriangleMesh.hh>
+#include <ObjectTypes/PolyMesh/PolyMesh.hh>
 #include "MastersThesisToolbar.hh"
 
 class MastersThesisPlugin : public QObject, BaseInterface, ToolboxInterface, LoggingInterface, LoadSaveInterface {
@@ -35,6 +36,9 @@ signals:
 
     // LoadSaveInterface
     void addEmptyObject(DataType _type, int &_id);
+
+    // BackupInterface
+    void createBackup( int _objectid, QString _name, UpdateType _type = UPDATE_ALL);
 
     void updatedObject(int _id, const UpdateType &_type);
 
@@ -66,6 +70,7 @@ private:
     //store selected vertices
     std::vector<int> constrained_vertices;
     std::vector<int> constrained_HEdges;
+
 
 };
 
