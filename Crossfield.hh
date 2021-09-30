@@ -51,14 +51,16 @@ private:
 
     void createCrossfields();
 
-    void setlocalCoordFrame();
+    void getAngleKbetweenTriangles(std::vector<int> &faces);
+
+    void setlocalCoordFrame(std::vector<int> &faces);
 
     void getBaryCenterAndRefEdge(std::vector<int> &faces);
 
-    void getConstraints(std::vector<int> &constraints);
+    void getConstraints(std::vector<int> &asdf);
 
     OpenMesh::FPropHandleT<TriMesh::Color> face_color;
-    OpenMesh::FPropHandleT<Point> reference_edge;
+    OpenMesh::FPropHandleT<std::pair<Point, int>> reference_edge;
     OpenMesh::FPropHandleT<Point> barycenter;
     OpenMesh::EPropHandleT<bool> associatedFace;
 

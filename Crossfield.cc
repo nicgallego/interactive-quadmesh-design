@@ -10,20 +10,43 @@ void Crossfield::getCrossfield() {
 }
 
 void Crossfield::createCrossfields() {
-    setlocalCoordFrame();
+    // first column has the constraints, second column contains the rest of the faces in range; do i need that?
+    std::vector<std::vector<int>> importantFaces;
+    std::vector<int> faces;
+    setlocalCoordFrame(faces);
+    getAngleKbetweenTriangles(faces);
 }
 
-void Crossfield::setlocalCoordFrame() {
+void Crossfield::getAngleKbetweenTriangles(std::vector<int> &faces) {
+    for (int i: faces) {
+        OpenMesh::FaceHandle fh = trimesh_.face_handle(i);
+        for (auto ff_it = trimesh_.ff_iter(fh); ff_it.is_valid(); ++ff_it) {
+            // neighbour needs to be in faces
+            if (true) {
+                //get reference edge of fh
+                //get reference edge of ff_it
+                for (auto fhe_it = trimesh_.fh_iter(fh); fhe_it.is_valid(); ++fhe_it) {
+                    for (auto fhe_temp_it = trimesh_.fh_iter(*ff_it); fhe_temp_it.is_valid(); ++fhe_temp_it) {
+                        // check which edge is the refEdge next/previous_halfedge/or this one
+                        // check if fhe_it == opposite(fhe_temp_it)
+                        std::cout << "hello World\n";
+                    }
+                }
+            }
+        }
+    }
+}
+
+void Crossfield::setlocalCoordFrame(std::vector<int> &faces) {
     // 4 works for vlr 55 works for hr file
-    int shrinkingFactor = 4;
-    std::vector<int> faces;
+    int shrinkingFactor = 10;
     getBaryCenterAndRefEdge(faces);
 
     for (int i: faces) {
         OpenMesh::VertexHandle vhandle[5];
         std::vector<OpenMesh::VertexHandle> face_handles;
         OpenMesh::FaceHandle fh = trimesh_.face_handle(i);
-        Point x_scale = trimesh_.property(reference_edge, fh);
+        Point x_scale = trimesh_.property(reference_edge, fh).first;
         Point x_scale_n = x_scale.normalize();
         Point x_scale_from_bary_p = trimesh_.property(barycenter, fh) + x_scale_n / shrinkingFactor;
         Point x_scale_from_bary_m = trimesh_.property(barycenter, fh) - x_scale_n / shrinkingFactor;
@@ -62,11 +85,11 @@ void Crossfield::getBaryCenterAndRefEdge(std::vector<int> &faces) {
     // request to change the status
     trimesh_.request_halfedge_status();
     trimesh_.request_face_status();
-    std::vector<int> constraints;
-    getConstraints(constraints);
+    std::vector<int> constrainedHEdges;
+    getConstraints(constrainedHEdges);
 
     // assign constraint edges to their faces
-    for (int i: constraints) {
+    for (int i: constrainedHEdges) {
         Point bCenter = {0, 0, 0};
         int valence = 0;
         OpenMesh::EdgeHandle eh = trimesh_.edge_handle(i);
@@ -82,7 +105,7 @@ void Crossfield::getBaryCenterAndRefEdge(std::vector<int> &faces) {
         // add barycenter to face
         trimesh_.property(barycenter, fh) = (bCenter / valence);
         // add reference edge to face
-        trimesh_.property(reference_edge, fh) = trimesh_.calc_edge_vector(heh);
+        trimesh_.property(reference_edge, fh) = {trimesh_.calc_edge_vector(heh), heh.idx()};
         // set face and edge as used
         trimesh_.status(heh).set_tagged(true);
         trimesh_.status(trimesh_.opposite_halfedge_handle(heh)).set_tagged(true);
@@ -108,7 +131,7 @@ void Crossfield::getBaryCenterAndRefEdge(std::vector<int> &faces) {
                 ++valence;
             }
             trimesh_.property(barycenter, fh) = (bCenter / valence);
-            trimesh_.property(reference_edge, fh) = trimesh_.calc_edge_vector(heh);
+            trimesh_.property(reference_edge, fh) = {trimesh_.calc_edge_vector(heh), heh.idx()};
             // both halfedges need to be tagged, else it is possible opposite faces share an edge
             trimesh_.status(heh).set_tagged(true);
             trimesh_.status(trimesh_.opposite_halfedge_handle(heh)).set_tagged(true);
