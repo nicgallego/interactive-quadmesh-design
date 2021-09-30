@@ -68,8 +68,8 @@ private:
     MastersThesisToolbar *tool_;
 
     //store selected vertices
-    std::vector<int> constrained_vertices;
-    std::vector<int> constrained_HEdges;
+    std::vector<int> includedVertices;
+    std::vector<int> includedHEdges;
 
 
 };

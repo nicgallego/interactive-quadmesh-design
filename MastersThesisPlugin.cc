@@ -30,11 +30,11 @@ void MastersThesisPlugin::slot_get_boundary() {
 
         if (trimesh) {
             DijkstraDistance mesh{*trimesh};
-            constrained_vertices = mesh.calculateDijkstra(refDist);
+            includedVertices = mesh.calculateDijkstra(refDist);
             if (inclBoundaryF)
-                mesh.includeBoundaryFaces(constrained_vertices, refDist);
-            constrained_HEdges = mesh.getHEinRange(constrained_vertices, refDist, inclBoundaryF);
-            mesh.colorizeEdges(constrained_HEdges);
+                mesh.includeBoundaryFaces(includedVertices, refDist);
+            includedHEdges = mesh.getHEinRange(includedVertices, refDist, inclBoundaryF);
+            mesh.colorizeEdges(includedHEdges);
             // change layer of display
             PluginFunctions::triMeshObject(*o_it)->meshNode()->drawMode(ACG::SceneGraph::DrawModes::EDGES_COLORED);
             emit updatedObject(o_it->id(), UPDATE_ALL);
@@ -50,7 +50,7 @@ void MastersThesisPlugin::slot_get_dualGraph() {
         TriMeshObject *tri_obj = PluginFunctions::triMeshObject(*o_it);
         TriMesh *trimesh = tri_obj->mesh();
         if (trimesh) {
-            Crossfield mesh{*trimesh, constrained_HEdges};
+            Crossfield mesh{*trimesh, includedHEdges};
             mesh.getCrossfield();
             PluginFunctions::triMeshObject(*o_it)->meshNode()->drawMode(ACG::SceneGraph::DrawModes::WIREFRAME);
             emit updatedObject(o_it->id(), UPDATE_ALL);

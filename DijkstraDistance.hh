@@ -33,12 +33,12 @@ public:
 
     std::vector<int> calculateDijkstra(const double refDist);
 
-    void includeBoundaryFaces(std::vector<int> &verticesInRange, const double refDist);
+    void includeBoundaryFaces(std::vector<int> &includedVertices, const double refDist);
 
     std::vector<int>
     getHEinRange(const std::vector<int> &verticesInRange, const double refDist, const bool inclBoundaryF);
 
-    void colorizeEdges(const std::vector<int> &heInRange);
+    void colorizeEdges(const std::vector<int> &includedHEdges);
 
 private:
     TriMesh &trimesh_;
@@ -49,7 +49,7 @@ private:
 
     double getSmallestDistPropVertex(std::vector<int> &allVertices, const double refDist);
 
-    void initializeDistanceProperty(std::vector<int> &allVertices);
+    void initializeDistanceProperty(std::vector<int> &constrainedVertices);
 
     void initializeSelectedVertices(std::vector<int> &selectedVertices, const double zeroDistance);
 
