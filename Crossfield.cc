@@ -14,32 +14,88 @@ void Crossfield::createCrossfields() {
     std::vector<std::vector<int>> importantFaces;
     std::vector<int> faces;
     setlocalCoordFrame(faces);
-    getAngleKbetweenTriangles(faces);
+    getKappa(faces);
 }
 
-void Crossfield::getAngleKbetweenTriangles(std::vector<int> &faces) {
+void Crossfield::getKappa(std::vector<int> &faces) {
     for (int i: faces) {
+        std::cout << "ith triangle: " << i << std::endl;
         OpenMesh::FaceHandle fh = trimesh_.face_handle(i);
         for (auto ff_it = trimesh_.ff_iter(fh); ff_it.is_valid(); ++ff_it) {
+            std::cout << "new neighbour: " << ff_it->idx() << std::endl;
             // neighbour needs to be in faces
-            if (true) {
-                //get reference edge of fh
-                //get reference edge of ff_it
-                for (auto fhe_it = trimesh_.fh_iter(fh); fhe_it.is_valid(); ++fhe_it) {
-                    for (auto fhe_temp_it = trimesh_.fh_iter(*ff_it); fhe_temp_it.is_valid(); ++fhe_temp_it) {
-                        // check which edge is the refEdge next/previous_halfedge/or this one
-                        // check if fhe_it == opposite(fhe_temp_it)
-                        std::cout << "hello World\n";
+            if (trimesh_.status(*ff_it).tagged()) {
+                double alpha, beta, kappa = DBL_MAX;
+                std::pair<int, int> commonEdge = {INT_MAX, INT_MAX};
+                // get index of ref edges
+                int refEdgeMain = trimesh_.property(reference_edge, fh).second;
+                int refEdgeNeigh = trimesh_.property(reference_edge, *ff_it).second;
+                // get the common edge between the triangles
+                for (auto fhe_it_main = trimesh_.fh_iter(fh); fhe_it_main.is_valid(); ++fhe_it_main) {
+                    for (auto fhe_it_neigh = trimesh_.fh_iter(*ff_it); fhe_it_neigh.is_valid(); ++fhe_it_neigh) {
+                        if (trimesh_.opposite_halfedge_handle(*fhe_it_main).idx() == fhe_it_neigh->idx()) {
+                            commonEdge.first = fhe_it_main->idx();
+                            commonEdge.second = fhe_it_neigh->idx();
+                            // as soon as the common edge is found, the loop is obsolete
+                            goto END_LOOP;
+                        }
                     }
                 }
+                END_LOOP:
+                // there are 9 different scenarios on how reference edges can be placed in two adjacent triangles
+                // refEdge shares common edge
+                if (refEdgeMain == commonEdge.first) {
+                    alpha = 0;
+                    if (refEdgeNeigh == commonEdge.second)
+                        beta = 0;
+                    if (refEdgeNeigh ==
+                        trimesh_.prev_halfedge_handle(trimesh_.halfedge_handle(commonEdge.second)).idx())
+                        beta = trimesh_.calc_sector_angle(trimesh_.halfedge_handle(refEdgeNeigh));
+                    if (refEdgeNeigh ==
+                        trimesh_.next_halfedge_handle(trimesh_.halfedge_handle(commonEdge.second)).idx())
+                        beta = trimesh_.calc_sector_angle(trimesh_.halfedge_handle(commonEdge.second));
+
+                    // refEdge is the previous halfedge of the common edge
+                } else if (refEdgeMain ==
+                           trimesh_.prev_halfedge_handle(trimesh_.halfedge_handle(commonEdge.first)).idx()) {
+                    alpha = trimesh_.calc_sector_angle(trimesh_.halfedge_handle(refEdgeMain));
+                    if (refEdgeNeigh == commonEdge.second)
+                        beta = 0;
+                    if (refEdgeNeigh ==
+                        trimesh_.prev_halfedge_handle(trimesh_.halfedge_handle(commonEdge.second)).idx())
+                        beta = M_PI - trimesh_.calc_sector_angle(trimesh_.halfedge_handle(refEdgeNeigh));
+                    if (refEdgeNeigh ==
+                        trimesh_.next_halfedge_handle(trimesh_.halfedge_handle(commonEdge.second)).idx())
+                        beta = trimesh_.calc_sector_angle(trimesh_.halfedge_handle(commonEdge.second));
+
+                    // refEdge is the next halfedge of the common edge
+                } else if (refEdgeMain ==
+                           trimesh_.next_halfedge_handle(trimesh_.halfedge_handle(commonEdge.first)).idx()) {
+                    alpha = trimesh_.calc_sector_angle(trimesh_.halfedge_handle(commonEdge.first));
+                    if (refEdgeNeigh == commonEdge.second)
+                        beta = 0;
+                    if (refEdgeNeigh ==
+                        trimesh_.prev_halfedge_handle(trimesh_.halfedge_handle(commonEdge.second)).idx())
+                        beta = trimesh_.calc_sector_angle(trimesh_.halfedge_handle(refEdgeNeigh));
+                    if (refEdgeNeigh ==
+                        trimesh_.next_halfedge_handle(trimesh_.halfedge_handle(commonEdge.second)).idx())
+                        beta = M_PI - trimesh_.calc_sector_angle(trimesh_.halfedge_handle(commonEdge.second));
+                } else {
+                    std::cerr << "Something went wrong, there needs to be a ref edge in the main triangle!\n";
+                }
+                // do something with kappa
+                kappa = alpha + beta;
+                std::cout << "Kappa is: " << kappa << " (" << kappa * 180 / M_PI << ") with alpha: " << alpha
+                          << " and beta: " << beta << std::endl;
             }
         }
     }
 }
 
+
 void Crossfield::setlocalCoordFrame(std::vector<int> &faces) {
     // 4 works for vlr 55 works for hr file
-    int shrinkingFactor = 10;
+    int shrinkingFactor = 4;
     getBaryCenterAndRefEdge(faces);
 
     for (int i: faces) {

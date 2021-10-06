@@ -51,7 +51,7 @@ private:
 
     void createCrossfields();
 
-    void getAngleKbetweenTriangles(std::vector<int> &faces);
+    void getKappa(std::vector<int> &faces);
 
     void setlocalCoordFrame(std::vector<int> &faces);
 
