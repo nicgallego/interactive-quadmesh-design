@@ -11,7 +11,10 @@
 #include <OpenMesh/Core/IO/MeshIO.hh>
 #include <MeshTools/MeshSelectionT.hh>
 #include <ACG/Geometry/Types/PlaneT.hh>
+#include <ACG/Scenegraph/LineNode.hh>
 #include <ACG/Utils/ColorCoder.hh>
+#include <CoMISo/Solver/ConstrainedSolver.hh>
+#include <gmm/gmm.h>
 #include <iostream>
 #include <vector>
 #include <float.h>
@@ -22,8 +25,9 @@ public:
 
     /*
      * is the same as:
-     * Crossfield(TriMesh &trimesh) {
+     * Crossfield(TriMesh &trimesh, std::vector<int> &heInRange) {
      *      trimesh_ = trimesh;
+     *      heInRange_ = heInRange;
      * }
      */
     Crossfield(TriMesh &trimesh, std::vector<int> &heInRange)
@@ -51,11 +55,11 @@ private:
 
     void createCrossfields();
 
-    void getKappa(std::vector<int> &faces);
+    std::map<int, double> getKappa(std::vector<int> const &faces);
 
-    void setlocalCoordFrame(std::vector<int> &faces);
+    void setlocalCoordFrame(std::vector<int> const &faces);
 
-    void getBaryCenterAndRefEdge(std::vector<int> &faces);
+    void getBaryCenterAndRefEdge(std::vector<int> &faces, const std::vector<int> &constrainedHEdges);
 
     void getConstraints(std::vector<int> &asdf);
 
@@ -66,7 +70,6 @@ private:
 
     TriMesh &trimesh_;
     std::vector<int> &heInRange_;
-    PolyMesh *dualGraph_;
 };
 
 

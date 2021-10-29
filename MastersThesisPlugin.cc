@@ -52,7 +52,7 @@ void MastersThesisPlugin::slot_get_dualGraph() {
         if (trimesh) {
             Crossfield mesh{*trimesh, includedHEdges};
             mesh.getCrossfield();
-            PluginFunctions::triMeshObject(*o_it)->meshNode()->drawMode(ACG::SceneGraph::DrawModes::WIREFRAME);
+            PluginFunctions::triMeshObject(*o_it)->meshNode()->drawMode(ACG::SceneGraph::DrawModes::EDGES_COLORED);
             emit updatedObject(o_it->id(), UPDATE_ALL);
         }
     }

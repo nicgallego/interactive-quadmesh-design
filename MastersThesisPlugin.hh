@@ -18,6 +18,7 @@ Q_OBJECT
     Q_INTERFACES(LoggingInterface)
     Q_INTERFACES(LoadSaveInterface)
 
+
 #if QT_VERSION >= 0x050000
     Q_PLUGIN_METADATA(IID "org.OpenFlipper.Plugins.Plugin-MastersThesis")
 #endif
@@ -38,7 +39,7 @@ signals:
     void addEmptyObject(DataType _type, int &_id);
 
     // BackupInterface
-    void createBackup( int _objectid, QString _name, UpdateType _type = UPDATE_ALL);
+    void createBackup(int _objectid, QString _name, UpdateType _type = UPDATE_ALL);
 
     void updatedObject(int _id, const UpdateType &_type);
 
