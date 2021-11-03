@@ -34,6 +34,7 @@ public:
             : trimesh_{trimesh}, heInRange_{heInRange} {
         trimesh.add_property(associatedFace, "Edge already associated with a Face");
         trimesh.add_property(face_color, "halfedge color");
+        trimesh.add_property(pos_matrixA, "row position of face in matrix A");
         trimesh.add_property(barycenter, "Barycenter of each Face");
         trimesh.add_property(reference_edge, "Edge associated with face, used for local coord sys");
     }
@@ -41,6 +42,7 @@ public:
     ~Crossfield() {
         trimesh_.remove_property(associatedFace);
         trimesh_.remove_property(face_color);
+        trimesh_.remove_property(pos_matrixA);
         trimesh_.remove_property(barycenter);
         trimesh_.remove_property(reference_edge);
     }
@@ -55,6 +57,8 @@ private:
 
     void createCrossfields();
 
+    void getMatrixA(std::vector<int> const &faces, std::map<int, double> const &edgeKappa);
+
     std::map<int, double> getKappa(std::vector<int> const &faces);
 
     void setlocalCoordFrame(std::vector<int> const &faces);
@@ -64,6 +68,7 @@ private:
     void getConstraints(std::vector<int> &asdf);
 
     OpenMesh::FPropHandleT<TriMesh::Color> face_color;
+    OpenMesh::FPropHandleT<int> pos_matrixA;
     OpenMesh::FPropHandleT<std::pair<Point, int>> reference_edge;
     OpenMesh::FPropHandleT<Point> barycenter;
     OpenMesh::EPropHandleT<bool> associatedFace;

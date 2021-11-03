@@ -13,14 +13,12 @@ void Crossfield::createCrossfields() {
     // first column has the constraints, second column contains the rest of the faces in range; do i need that?
     std::vector<int> faces;
     std::vector<int> constrainedHEdges;
-    std::vector<int> _A;
-    std::vector<int> _x;
-    std::vector<int> _rhs;
-    std::vector<int> _idx_to_round;
+    std::map<int, double> edgeKappa;
     getConstraints(constrainedHEdges);
     getBaryCenterAndRefEdge(faces, constrainedHEdges);
     setlocalCoordFrame(faces);
-    std::map<int, double> edgeKappa = getKappa(faces);
+    edgeKappa = getKappa(faces);
+    getMatrixA(faces, edgeKappa);
     COMISO::ConstrainedSolver csolver;
     csolver.misolver().set_iter_full(false);
     csolver.misolver().set_local_iters(50000);
@@ -36,6 +34,62 @@ void Crossfield::createCrossfields() {
                   << std::endl;
     }
 
+}
+
+void Crossfield::getMatrixA(const std::vector<int> &faces, const std::map<int, double> &edgeKappa) {
+    trimesh_.release_halfedge_status();
+    trimesh_.release_face_status();
+    // request to change the status
+    trimesh_.request_halfedge_status();
+    trimesh_.request_face_status();
+    int counter = 0;
+    int iteration = 0;
+    int n = edgeKappa.size() + faces.size();
+    int pj_start = faces.size();
+    gmm::col_matrix<gmm::wsvector<double>> _Atemp(n, n);
+    for (auto const &i: edgeKappa) {
+        OpenMesh::EdgeHandle eh = trimesh_.edge_handle(i.first);
+        OpenMesh::FaceHandle fh1 = trimesh_.face_handle(trimesh_.halfedge_handle(eh, 0));
+        OpenMesh::FaceHandle fh2 = trimesh_.face_handle(trimesh_.halfedge_handle(eh, 1));
+        if (!trimesh_.status(fh1).tagged()) {
+            trimesh_.property(pos_matrixA, fh1) = counter;
+            trimesh_.status(fh1).set_tagged(true);
+            counter++;
+        }
+        if (!trimesh_.status(fh2).tagged()) {
+            trimesh_.property(pos_matrixA, fh2) = counter;
+            trimesh_.status(fh2).set_tagged(true);
+            counter++;
+        }
+    }
+    std::cout << "=================================================\n";
+    for (auto const &i: edgeKappa) {
+        OpenMesh::EdgeHandle eh = trimesh_.edge_handle(i.first);
+        OpenMesh::FaceHandle fh1 = trimesh_.face_handle(trimesh_.halfedge_handle(eh, 0));
+        OpenMesh::FaceHandle fh2 = trimesh_.face_handle(trimesh_.halfedge_handle(eh, 1));
+//        int pos_a = trimesh_.property(pos_matrixA, fh1);
+//        int pos_b = trimesh_.property(pos_matrixA, fh2);
+        int pos_a = fh1.idx();
+        int pos_b = fh2.idx();
+        _Atemp(pos_a, pos_a) = 2.0;
+        _Atemp(pos_a, pos_b) = -2.0;
+        _Atemp(pos_a, pj_start + iteration) = M_PI;
+        _Atemp(pos_b, pos_a) = -2.0;
+        _Atemp(pos_b, pos_b) = 2.0;
+        _Atemp(pos_b, pj_start + iteration) = -M_PI;
+        _Atemp(pj_start + iteration, pos_a) = M_PI;
+        _Atemp(pj_start + iteration, pos_b) = -M_PI;
+        _Atemp(pj_start + iteration, pj_start + iteration) = pow(M_PI, 2) / 2;
+        iteration++;
+
+        std::cout << "Face Index 1: " << fh1.idx() << " with position: " << trimesh_.property(pos_matrixA, fh1)
+                  << std::endl
+                  << "Face Index 2: " << fh2.idx() << " with position: " << trimesh_.property(pos_matrixA, fh2)
+                  << std::endl;
+    }
+    std::cout << "=================================================\n";
+    std::cout << _Atemp << std::endl;
+    std::cout << "=================================================\n";
 }
 
 std::map<int, double> Crossfield::getKappa(std::vector<int> const &faces) {
@@ -133,24 +187,24 @@ void Crossfield::setlocalCoordFrame(std::vector<int> const &faces) {
         Point y_scale_from_bary_n = trimesh_.property(barycenter, fh) - y_scale_n / shrinkingFactor;
 
 
-        vhandle[0] = trimesh_.add_vertex(trimesh_.property(barycenter, fh));
-        vhandle[1] = trimesh_.add_vertex(x_scale_from_bary_p);
-        vhandle[2] = trimesh_.add_vertex((x_scale_from_bary_m));
-        vhandle[3] = trimesh_.add_vertex(y_scale_from_bary_p);
-        vhandle[4] = trimesh_.add_vertex((y_scale_from_bary_n));
-
-        // create x axis
-        face_handles.clear();
-        face_handles.push_back(vhandle[1]);
-        face_handles.push_back(vhandle[0]);
-        face_handles.push_back(vhandle[2]);
-        trimesh_.add_face(face_handles);
-        //create y axis
-        face_handles.clear();
-        face_handles.push_back(vhandle[3]);
-        face_handles.push_back(vhandle[0]);
-        face_handles.push_back(vhandle[4]);
-        trimesh_.add_face(face_handles);
+//        vhandle[0] = trimesh_.add_vertex(trimesh_.property(barycenter, fh));
+//        vhandle[1] = trimesh_.add_vertex(x_scale_from_bary_p);
+//        vhandle[2] = trimesh_.add_vertex((x_scale_from_bary_m));
+//        vhandle[3] = trimesh_.add_vertex(y_scale_from_bary_p);
+//        vhandle[4] = trimesh_.add_vertex((y_scale_from_bary_n));
+//
+//        // create x axis
+//        face_handles.clear();
+//        face_handles.push_back(vhandle[1]);
+//        face_handles.push_back(vhandle[0]);
+//        face_handles.push_back(vhandle[2]);
+//        trimesh_.add_face(face_handles);
+//        //create y axis
+//        face_handles.clear();
+//        face_handles.push_back(vhandle[3]);
+//        face_handles.push_back(vhandle[0]);
+//        face_handles.push_back(vhandle[4]);
+//        trimesh_.add_face(face_handles);
     }
 }
 
@@ -176,15 +230,17 @@ void Crossfield::getBaryCenterAndRefEdge(std::vector<int> &faces, const std::vec
             bCenter += trimesh_.point(*fv_it);
             ++valence;
         }
-        // add barycenter to face
-        trimesh_.property(barycenter, fh) = (bCenter / valence);
-        // add reference edge to face
-        trimesh_.property(reference_edge, fh) = {trimesh_.calc_edge_vector(heh), heh.idx()};
-        // set face and edge as used
-        trimesh_.status(heh).set_tagged(true);
-        trimesh_.status(trimesh_.opposite_halfedge_handle(heh)).set_tagged(true);
-        trimesh_.status(fh).set_tagged(true);
-        faces.push_back(fh.idx());
+        if (!trimesh_.status(heh).tagged() && !trimesh_.status(fh).tagged()) {
+            // add barycenter to face
+            trimesh_.property(barycenter, fh) = (bCenter / valence);
+            // add reference edge to face
+            trimesh_.property(reference_edge, fh) = {trimesh_.calc_edge_vector(heh), heh.idx()};
+            // set face and edge as used
+            trimesh_.status(heh).set_tagged(true);
+            trimesh_.status(trimesh_.opposite_halfedge_handle(heh)).set_tagged(true);
+            trimesh_.status(fh).set_tagged(true);
+            faces.push_back(fh.idx());
+        }
     }
 
     // assign reference edges in range to faces
