@@ -57,15 +57,15 @@ private:
 
     void createCrossfields();
 
-    void getMatrixA(std::vector<int> const &faces, std::map<int, double> const &edgeKappa);
+    gmm::csc_matrix<double> getMatrixA(std::vector<int> const &faces, std::map<int, double> const &edgeKappa);
 
     std::map<int, double> getKappa(std::vector<int> const &faces);
 
     void setlocalCoordFrame(std::vector<int> const &faces);
 
-    void getBaryCenterAndRefEdge(std::vector<int> &faces, const std::vector<int> &constrainedHEdges);
+    std::vector<int> getBaryCenterAndRefEdge(const std::vector<int> &constrainedHEdges);
 
-    void getConstraints(std::vector<int> &asdf);
+    std::vector<int> getConstraints();
 
     OpenMesh::FPropHandleT<TriMesh::Color> face_color;
     OpenMesh::FPropHandleT<int> pos_matrixA;

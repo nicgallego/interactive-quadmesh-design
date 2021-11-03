@@ -4,21 +4,20 @@
 
 #include "Crossfield.hh"
 
-
 void Crossfield::getCrossfield() {
     createCrossfields();
 }
 
 void Crossfield::createCrossfields() {
-    // first column has the constraints, second column contains the rest of the faces in range; do i need that?
-    std::vector<int> faces;
-    std::vector<int> constrainedHEdges;
-    std::map<int, double> edgeKappa;
-    getConstraints(constrainedHEdges);
-    getBaryCenterAndRefEdge(faces, constrainedHEdges);
+    std::vector<int> constrainedHEdges = getConstraints();
+    std::vector<int> faces = getBaryCenterAndRefEdge(constrainedHEdges);
     setlocalCoordFrame(faces);
-    edgeKappa = getKappa(faces);
-    getMatrixA(faces, edgeKappa);
+    std::map<int, double> edgeKappa = getKappa(faces);
+    gmm::row_matrix<gmm::wsvector<double>> _constraints(10, 10); //?
+    gmm::csc_matrix<double> _A = getMatrixA(faces, edgeKappa);
+    std::vector<double> _x(edgeKappa.size() + faces.size());
+    std::vector<double> _rhs(edgeKappa.size() + faces.size()); //?
+    std::vector<double> _idx_to_round(edgeKappa.size()); //?
     COMISO::ConstrainedSolver csolver;
     csolver.misolver().set_iter_full(false);
     csolver.misolver().set_local_iters(50000);
@@ -26,17 +25,11 @@ void Crossfield::createCrossfields() {
     csolver.misolver().set_local_error(1e-3);
     csolver.misolver().set_cg_error(1e-3);
     csolver.misolver().set_multiple_rounding();
-
-//    csolver.solve(constrainedHEdges, )
-    for (auto it = edgeKappa.begin(); it != edgeKappa.cend(); ++it) {
-        std::cout << "edge: " << it->first << " with angle: " << it->second << " (" << (it->second / M_PI * 180)
-                  << " deg)"
-                  << std::endl;
-    }
+//    csolver.solve(constrainedHEdges, );
 
 }
 
-void Crossfield::getMatrixA(const std::vector<int> &faces, const std::map<int, double> &edgeKappa) {
+gmm::csc_matrix<double> Crossfield::getMatrixA(const std::vector<int> &faces, const std::map<int, double> &edgeKappa) {
     trimesh_.release_halfedge_status();
     trimesh_.release_face_status();
     // request to change the status
@@ -46,7 +39,10 @@ void Crossfield::getMatrixA(const std::vector<int> &faces, const std::map<int, d
     int iteration = 0;
     int n = edgeKappa.size() + faces.size();
     int pj_start = faces.size();
+    gmm::csc_matrix<double> _A;
     gmm::col_matrix<gmm::wsvector<double>> _Atemp(n, n);
+    // indexes the faces from 0 to n
+    // this is needed in case a face index is higher than the matrix size
     for (auto const &i: edgeKappa) {
         OpenMesh::EdgeHandle eh = trimesh_.edge_handle(i.first);
         OpenMesh::FaceHandle fh1 = trimesh_.face_handle(trimesh_.halfedge_handle(eh, 0));
@@ -62,15 +58,16 @@ void Crossfield::getMatrixA(const std::vector<int> &faces, const std::map<int, d
             counter++;
         }
     }
-    std::cout << "=================================================\n";
+    // fills up sparse column matrix _A
     for (auto const &i: edgeKappa) {
         OpenMesh::EdgeHandle eh = trimesh_.edge_handle(i.first);
         OpenMesh::FaceHandle fh1 = trimesh_.face_handle(trimesh_.halfedge_handle(eh, 0));
         OpenMesh::FaceHandle fh2 = trimesh_.face_handle(trimesh_.halfedge_handle(eh, 1));
-//        int pos_a = trimesh_.property(pos_matrixA, fh1);
-//        int pos_b = trimesh_.property(pos_matrixA, fh2);
-        int pos_a = fh1.idx();
-        int pos_b = fh2.idx();
+        int pos_a = trimesh_.property(pos_matrixA, fh1);
+        int pos_b = trimesh_.property(pos_matrixA, fh2);
+        // |  2   -2     pi |
+        // | -2    2    -pi |
+        // | pi  -pi pi^2/2 |
         _Atemp(pos_a, pos_a) = 2.0;
         _Atemp(pos_a, pos_b) = -2.0;
         _Atemp(pos_a, pj_start + iteration) = M_PI;
@@ -81,15 +78,12 @@ void Crossfield::getMatrixA(const std::vector<int> &faces, const std::map<int, d
         _Atemp(pj_start + iteration, pos_b) = -M_PI;
         _Atemp(pj_start + iteration, pj_start + iteration) = pow(M_PI, 2) / 2;
         iteration++;
-
-        std::cout << "Face Index 1: " << fh1.idx() << " with position: " << trimesh_.property(pos_matrixA, fh1)
-                  << std::endl
-                  << "Face Index 2: " << fh2.idx() << " with position: " << trimesh_.property(pos_matrixA, fh2)
-                  << std::endl;
     }
-    std::cout << "=================================================\n";
-    std::cout << _Atemp << std::endl;
-    std::cout << "=================================================\n";
+    gmm::clean(_Atemp, 1E-10);
+    // copy to csc_matrix -> this matrix is more compressed
+    gmm::copy(_Atemp, _A);
+    std::cout << "hello world\n";
+    return _A;
 }
 
 std::map<int, double> Crossfield::getKappa(std::vector<int> const &faces) {
@@ -208,13 +202,14 @@ void Crossfield::setlocalCoordFrame(std::vector<int> const &faces) {
     }
 }
 
-void Crossfield::getBaryCenterAndRefEdge(std::vector<int> &faces, const std::vector<int> &constrainedHEdges) {
+std::vector<int> Crossfield::getBaryCenterAndRefEdge(const std::vector<int> &constrainedHEdges) {
     // status needs to be released before using, in case it still has saved some stuff from before
     trimesh_.release_halfedge_status();
     trimesh_.release_face_status();
     // request to change the status
     trimesh_.request_halfedge_status();
     trimesh_.request_face_status();
+    std::vector<int> faces;
 
     // assign constraint edges to their faces
     for (int i: constrainedHEdges) {
@@ -269,10 +264,12 @@ void Crossfield::getBaryCenterAndRefEdge(std::vector<int> &faces, const std::vec
             faces.push_back(fh.idx());
         }
     }
+    return faces;
 }
 
 // convert array of halfedges to faces and fill constraints with them
-void Crossfield::getConstraints(std::vector<int> &constraints) {
+std::vector<int> Crossfield::getConstraints() {
+    std::vector<int> constraints;
     std::vector<int> selectedVertices = MeshSelection::getVertexSelection(&trimesh_);
     std::vector<int> selectedEdges = MeshSelection::getEdgeSelection(&trimesh_);
     std::vector<int> selectedHEdges = MeshSelection::getHalfedgeSelection(&trimesh_);
@@ -322,6 +319,7 @@ void Crossfield::getConstraints(std::vector<int> &constraints) {
             }
         }
     }
+    return constraints;
 }
 
 
