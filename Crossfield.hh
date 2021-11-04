@@ -36,7 +36,7 @@ public:
         trimesh.add_property(face_color, "halfedge color");
         trimesh.add_property(pos_matrixA, "row position of face in matrix A");
         trimesh.add_property(barycenter, "Barycenter of each Face");
-        trimesh.add_property(reference_edge, "Edge associated with face, used for local coord sys");
+        trimesh.add_property(reference_HEdge, "Edge associated with face, used for local coord sys");
     }
 
     ~Crossfield() {
@@ -44,7 +44,7 @@ public:
         trimesh_.remove_property(face_color);
         trimesh_.remove_property(pos_matrixA);
         trimesh_.remove_property(barycenter);
-        trimesh_.remove_property(reference_edge);
+        trimesh_.remove_property(reference_HEdge);
     }
 
 public:
@@ -57,19 +57,23 @@ private:
 
     void createCrossfields();
 
-    gmm::csc_matrix<double> getMatrixA(std::vector<int> const &faces, std::map<int, double> const &edgeKappa);
+    std::vector<double> getRHS(const std::map<int, double> &edgeKappa, const std::vector<int> &faces);
 
-    std::map<int, double> getKappa(std::vector<int> const &faces);
+    gmm::csc_matrix<double> getMatrixA(const std::vector<int> &faces, const std::map<int, double> &edgeKappa);
 
-    void setlocalCoordFrame(std::vector<int> const &faces);
+    std::map<int, double> getKappa(const std::vector<int> &faces);
+
+    void setlocalCoordFrame(const std::vector<int> &faces);
 
     std::vector<int> getBaryCenterAndRefEdge(const std::vector<int> &constrainedHEdges);
 
     std::vector<int> getConstraints();
 
+    double  getTotalArea(const std::vector<int> &faces);
+
     OpenMesh::FPropHandleT<TriMesh::Color> face_color;
     OpenMesh::FPropHandleT<int> pos_matrixA;
-    OpenMesh::FPropHandleT<std::pair<Point, int>> reference_edge;
+    OpenMesh::FPropHandleT<std::pair<Point, int>> reference_HEdge;
     OpenMesh::FPropHandleT<Point> barycenter;
     OpenMesh::EPropHandleT<bool> associatedFace;
 

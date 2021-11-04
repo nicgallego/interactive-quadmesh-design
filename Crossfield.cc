@@ -16,7 +16,7 @@ void Crossfield::createCrossfields() {
     gmm::row_matrix<gmm::wsvector<double>> _constraints(10, 10); //?
     gmm::csc_matrix<double> _A = getMatrixA(faces, edgeKappa);
     std::vector<double> _x(edgeKappa.size() + faces.size());
-    std::vector<double> _rhs(edgeKappa.size() + faces.size()); //?
+    std::vector<double> _rhs = getRHS(edgeKappa, faces);
     std::vector<double> _idx_to_round(edgeKappa.size()); //?
     COMISO::ConstrainedSolver csolver;
     csolver.misolver().set_iter_full(false);
@@ -27,6 +27,41 @@ void Crossfield::createCrossfields() {
     csolver.misolver().set_multiple_rounding();
 //    csolver.solve(constrainedHEdges, );
 
+}
+
+std::vector<double> Crossfield::getRHS(const std::map<int, double> &edgeKappa, const std::vector<int> &faces) {
+    std::vector<double> _rhs(faces.size() + edgeKappa.size());
+//    double totalarea = getTotalArea(faces);
+//    double edge_weight = 0;
+    int facesPlusOne = faces.size();
+    for (int i: faces) {
+        double sum = 0;
+        OpenMesh::FaceHandle fh = trimesh_.face_handle(i);
+        for (auto fh_it = trimesh_.fh_iter(fh); fh_it.is_valid(); ++fh_it) {
+            OpenMesh::FaceHandle opposite_fh = trimesh_.face_handle(trimesh_.opposite_halfedge_handle(*fh_it));
+            auto it = edgeKappa.find(fh_it->idx());
+            auto it2 = edgeKappa.find(trimesh_.opposite_halfedge_handle(*fh_it).idx());
+//            edge_weight = ((trimesh_.calc_face_area(fh) / 3) + (trimesh_.calc_face_area(opposite_fh) / 3)) / totalarea;
+            if (it != edgeKappa.end())
+                sum += (it->second);
+            if (it2 != edgeKappa.end())
+                sum -= (it2->second);
+            if (it != edgeKappa.end() && it2 != edgeKappa.end()) {
+                throw std::runtime_error(
+                        "Opposite Halfedges can't both be in edgeKappa!\n");
+            }
+        }
+        int position = trimesh_.property(pos_matrixA, fh);
+        _rhs[position] = sum;
+    }
+    for (const auto &i: edgeKappa) {
+        OpenMesh::HalfedgeHandle heh = trimesh_.halfedge_handle(i.first);
+        OpenMesh::FaceHandle fh = trimesh_.face_handle(heh);
+        OpenMesh::FaceHandle opposite_fh = trimesh_.face_handle(trimesh_.opposite_halfedge_handle(heh));
+//        edge_weight = ((trimesh_.calc_face_area(fh) / 3) + (trimesh_.calc_face_area(opposite_fh) / 3)) / totalarea;
+        _rhs[facesPlusOne++] = (i.second);
+    }
+    return _rhs;
 }
 
 gmm::csc_matrix<double> Crossfield::getMatrixA(const std::vector<int> &faces, const std::map<int, double> &edgeKappa) {
@@ -44,9 +79,9 @@ gmm::csc_matrix<double> Crossfield::getMatrixA(const std::vector<int> &faces, co
     // indexes the faces from 0 to n
     // this is needed in case a face index is higher than the matrix size
     for (auto const &i: edgeKappa) {
-        OpenMesh::EdgeHandle eh = trimesh_.edge_handle(i.first);
-        OpenMesh::FaceHandle fh1 = trimesh_.face_handle(trimesh_.halfedge_handle(eh, 0));
-        OpenMesh::FaceHandle fh2 = trimesh_.face_handle(trimesh_.halfedge_handle(eh, 1));
+        OpenMesh::HalfedgeHandle heh = trimesh_.halfedge_handle(i.first);
+        OpenMesh::FaceHandle fh1 = trimesh_.face_handle(heh);
+        OpenMesh::FaceHandle fh2 = trimesh_.face_handle(trimesh_.opposite_halfedge_handle(heh));
         if (!trimesh_.status(fh1).tagged()) {
             trimesh_.property(pos_matrixA, fh1) = counter;
             trimesh_.status(fh1).set_tagged(true);
@@ -60,9 +95,9 @@ gmm::csc_matrix<double> Crossfield::getMatrixA(const std::vector<int> &faces, co
     }
     // fills up sparse column matrix _A
     for (auto const &i: edgeKappa) {
-        OpenMesh::EdgeHandle eh = trimesh_.edge_handle(i.first);
-        OpenMesh::FaceHandle fh1 = trimesh_.face_handle(trimesh_.halfedge_handle(eh, 0));
-        OpenMesh::FaceHandle fh2 = trimesh_.face_handle(trimesh_.halfedge_handle(eh, 1));
+        OpenMesh::HalfedgeHandle heh = trimesh_.halfedge_handle(i.first);
+        OpenMesh::FaceHandle fh1 = trimesh_.face_handle(heh);
+        OpenMesh::FaceHandle fh2 = trimesh_.face_handle(trimesh_.opposite_halfedge_handle(heh));
         int pos_a = trimesh_.property(pos_matrixA, fh1);
         int pos_b = trimesh_.property(pos_matrixA, fh2);
         // |  2   -2     pi |
@@ -82,11 +117,10 @@ gmm::csc_matrix<double> Crossfield::getMatrixA(const std::vector<int> &faces, co
     gmm::clean(_Atemp, 1E-10);
     // copy to csc_matrix -> this matrix is more compressed
     gmm::copy(_Atemp, _A);
-    std::cout << "hello world\n";
     return _A;
 }
 
-std::map<int, double> Crossfield::getKappa(std::vector<int> const &faces) {
+std::map<int, double> Crossfield::getKappa(const std::vector<int> &faces) {
     std::map<int, double> edgeKappa;
     for (int i: faces) {
         OpenMesh::FaceHandle fh = trimesh_.face_handle(i);
@@ -96,8 +130,8 @@ std::map<int, double> Crossfield::getKappa(std::vector<int> const &faces) {
                 double alpha = DBL_MAX, beta = alpha, kappa = alpha;
                 std::pair<int, int> commonEdge = {INT_MAX, INT_MAX};
                 // get index of ref edges
-                int refEdgeMain = trimesh_.property(reference_edge, fh).second;
-                int refEdgeNeigh = trimesh_.property(reference_edge, *ff_it).second;
+                int refEdgeMain = trimesh_.property(reference_HEdge, fh).second;
+                int refEdgeNeigh = trimesh_.property(reference_HEdge, *ff_it).second;
                 // get the common edge between the triangles
                 for (auto fhe_it_main = trimesh_.fh_iter(fh); fhe_it_main.is_valid(); ++fhe_it_main) {
                     for (auto fhe_it_neigh = trimesh_.fh_iter(*ff_it); fhe_it_neigh.is_valid(); ++fhe_it_neigh) {
@@ -151,9 +185,14 @@ std::map<int, double> Crossfield::getKappa(std::vector<int> const &faces) {
                     throw std::runtime_error(
                             "Something went wrong, there needs to be a ref edge in the main triangle!\n");
                 }
-                kappa = alpha + beta;
-                int edgeIndex = trimesh_.edge_handle(trimesh_.halfedge_handle(commonEdge.first)).idx();
-                edgeKappa[edgeIndex] = kappa;
+                // if opposite halfedge isn't in edgeKappa add it else do nothing
+                if (edgeKappa.find(
+                        trimesh_.opposite_halfedge_handle(trimesh_.halfedge_handle(commonEdge.first)).idx()) ==
+                    edgeKappa.end()) {
+                    kappa = (alpha + beta);
+                    int edgeIndex = commonEdge.first;
+                    edgeKappa[edgeIndex] = kappa;
+                }
             }
         }
     }
@@ -161,7 +200,7 @@ std::map<int, double> Crossfield::getKappa(std::vector<int> const &faces) {
 }
 
 
-void Crossfield::setlocalCoordFrame(std::vector<int> const &faces) {
+void Crossfield::setlocalCoordFrame(const std::vector<int> &faces) {
     // 4 works for vlr 55 works for hr file
     int shrinkingFactor = 4;
 
@@ -169,7 +208,7 @@ void Crossfield::setlocalCoordFrame(std::vector<int> const &faces) {
         OpenMesh::VertexHandle vhandle[5];
         std::vector<OpenMesh::VertexHandle> face_handles;
         OpenMesh::FaceHandle fh = trimesh_.face_handle(i);
-        Point x_scale = trimesh_.property(reference_edge, fh).first;
+        Point x_scale = trimesh_.property(reference_HEdge, fh).first;
         Point x_scale_n = x_scale.normalize();
         Point x_scale_from_bary_p = trimesh_.property(barycenter, fh) + x_scale_n / shrinkingFactor;
         Point x_scale_from_bary_m = trimesh_.property(barycenter, fh) - x_scale_n / shrinkingFactor;
@@ -229,7 +268,7 @@ std::vector<int> Crossfield::getBaryCenterAndRefEdge(const std::vector<int> &con
             // add barycenter to face
             trimesh_.property(barycenter, fh) = (bCenter / valence);
             // add reference edge to face
-            trimesh_.property(reference_edge, fh) = {trimesh_.calc_edge_vector(heh), heh.idx()};
+            trimesh_.property(reference_HEdge, fh) = {trimesh_.calc_edge_vector(heh), heh.idx()};
             // set face and edge as used
             trimesh_.status(heh).set_tagged(true);
             trimesh_.status(trimesh_.opposite_halfedge_handle(heh)).set_tagged(true);
@@ -256,7 +295,7 @@ std::vector<int> Crossfield::getBaryCenterAndRefEdge(const std::vector<int> &con
                 ++valence;
             }
             trimesh_.property(barycenter, fh) = (bCenter / valence);
-            trimesh_.property(reference_edge, fh) = {trimesh_.calc_edge_vector(heh), heh.idx()};
+            trimesh_.property(reference_HEdge, fh) = {trimesh_.calc_edge_vector(heh), heh.idx()};
             // both halfedges need to be tagged, else it is possible opposite faces share an edge
             trimesh_.status(heh).set_tagged(true);
             trimesh_.status(trimesh_.opposite_halfedge_handle(heh)).set_tagged(true);
@@ -322,5 +361,10 @@ std::vector<int> Crossfield::getConstraints() {
     return constraints;
 }
 
-
+double Crossfield::getTotalArea(const std::vector<int> &faces) {
+    double totalarea = 0;
+    for (int i: faces)
+        totalarea += trimesh_.calc_face_area(trimesh_.face_handle(i));
+    return totalarea;
+}
 
