@@ -31,21 +31,28 @@ void Crossfield::createCrossfields() {
 
 std::vector<double> Crossfield::getRHS(const std::map<int, double> &edgeKappa, const std::vector<int> &faces) {
     std::vector<double> _rhs(faces.size() + edgeKappa.size());
-//    double totalarea = getTotalArea(faces);
-//    double edge_weight = 0;
+    double totalArea = getTotalArea(faces);
+    double edge_weight = 1;
     int facesPlusOne = faces.size();
     for (int i: faces) {
         double sum = 0;
         OpenMesh::FaceHandle fh = trimesh_.face_handle(i);
         for (auto fh_it = trimesh_.fh_iter(fh); fh_it.is_valid(); ++fh_it) {
-            OpenMesh::FaceHandle opposite_fh = trimesh_.face_handle(trimesh_.opposite_halfedge_handle(*fh_it));
+            OpenMesh::HalfedgeHandle opposite_heh = trimesh_.opposite_halfedge_handle(*fh_it);
+            OpenMesh::FaceHandle opposite_fh;
+            // this condition is necessary because an opposite face doesn't exist if the opposite heh is boundary
+            if (!trimesh_.is_boundary(opposite_heh)) {
+                opposite_fh = trimesh_.face_handle(trimesh_.opposite_halfedge_handle(*fh_it));
+                edge_weight =
+                        ((trimesh_.calc_face_area(fh) / 3) + (trimesh_.calc_face_area(opposite_fh) / 3)) / totalArea;
+            }
             auto it = edgeKappa.find(fh_it->idx());
-            auto it2 = edgeKappa.find(trimesh_.opposite_halfedge_handle(*fh_it).idx());
-//            edge_weight = ((trimesh_.calc_face_area(fh) / 3) + (trimesh_.calc_face_area(opposite_fh) / 3)) / totalarea;
+            auto it2 = edgeKappa.find(opposite_heh.idx());
+            // it doesn't matter that edge_weight doesn't have a valeu, since this condition is never true, if edge_weight is valueless
             if (it != edgeKappa.end())
-                sum += (it->second);
+                sum += (it->second * edge_weight);
             if (it2 != edgeKappa.end())
-                sum -= (it2->second);
+                sum -= (it2->second * edge_weight);
             if (it != edgeKappa.end() && it2 != edgeKappa.end()) {
                 throw std::runtime_error(
                         "Opposite Halfedges can't both be in edgeKappa!\n");
@@ -58,9 +65,11 @@ std::vector<double> Crossfield::getRHS(const std::map<int, double> &edgeKappa, c
         OpenMesh::HalfedgeHandle heh = trimesh_.halfedge_handle(i.first);
         OpenMesh::FaceHandle fh = trimesh_.face_handle(heh);
         OpenMesh::FaceHandle opposite_fh = trimesh_.face_handle(trimesh_.opposite_halfedge_handle(heh));
-//        edge_weight = ((trimesh_.calc_face_area(fh) / 3) + (trimesh_.calc_face_area(opposite_fh) / 3)) / totalarea;
-        _rhs[facesPlusOne++] = (i.second);
+        edge_weight = ((trimesh_.calc_face_area(fh) / 3) + (trimesh_.calc_face_area(opposite_fh) / 3)) / totalArea;
+        _rhs[facesPlusOne++] = (i.second * edge_weight);
     }
+    // scalar multiplication with vector, b*-1 = -b
+    gmm::scale(_rhs, -1.0);
     return _rhs;
 }
 
@@ -70,10 +79,8 @@ gmm::csc_matrix<double> Crossfield::getMatrixA(const std::vector<int> &faces, co
     // request to change the status
     trimesh_.request_halfedge_status();
     trimesh_.request_face_status();
-    int counter = 0;
-    int iteration = 0;
-    int n = edgeKappa.size() + faces.size();
-    int pj_start = faces.size();
+    int counter = 0, iteration = 0, pj_start = faces.size(), n = edgeKappa.size() + faces.size();
+    double edge_weight = 0, totalArea = getTotalArea(faces);
     gmm::csc_matrix<double> _A;
     gmm::col_matrix<gmm::wsvector<double>> _Atemp(n, n);
     // indexes the faces from 0 to n
@@ -98,20 +105,21 @@ gmm::csc_matrix<double> Crossfield::getMatrixA(const std::vector<int> &faces, co
         OpenMesh::HalfedgeHandle heh = trimesh_.halfedge_handle(i.first);
         OpenMesh::FaceHandle fh1 = trimesh_.face_handle(heh);
         OpenMesh::FaceHandle fh2 = trimesh_.face_handle(trimesh_.opposite_halfedge_handle(heh));
-        int pos_a = trimesh_.property(pos_matrixA, fh1);
-        int pos_b = trimesh_.property(pos_matrixA, fh2);
-        // |  2   -2     pi |
-        // | -2    2    -pi |
-        // | pi  -pi pi^2/2 |
-        _Atemp(pos_a, pos_a) = 2.0;
-        _Atemp(pos_a, pos_b) = -2.0;
-        _Atemp(pos_a, pj_start + iteration) = M_PI;
-        _Atemp(pos_b, pos_a) = -2.0;
-        _Atemp(pos_b, pos_b) = 2.0;
-        _Atemp(pos_b, pj_start + iteration) = -M_PI;
-        _Atemp(pj_start + iteration, pos_a) = M_PI;
-        _Atemp(pj_start + iteration, pos_b) = -M_PI;
-        _Atemp(pj_start + iteration, pj_start + iteration) = pow(M_PI, 2) / 2;
+        edge_weight = ((trimesh_.calc_face_area(fh1) / 3) + (trimesh_.calc_face_area(fh2) / 3)) / totalArea;
+        int pos_i = trimesh_.property(pos_matrixA, fh1);
+        int pos_j = trimesh_.property(pos_matrixA, fh2);
+        // |  2*w_ij   -2*w_ij     pi*w_ij |
+        // | -2*w_ij    2*w_ij    -pi*w_ij |
+        // | pi*w_ij  -pi*w_ij pi^2/2*w_ij |
+        _Atemp(pos_i, pos_i) = 2.0 * edge_weight;
+        _Atemp(pos_i, pos_j) = -2.0 * edge_weight;
+        _Atemp(pos_i, pj_start + iteration) = M_PI * edge_weight;
+        _Atemp(pos_j, pos_i) = -2.0 * edge_weight;
+        _Atemp(pos_j, pos_j) = 2.0 * edge_weight;
+        _Atemp(pos_j, pj_start + iteration) = -M_PI * edge_weight;
+        _Atemp(pj_start + iteration, pos_i) = M_PI * edge_weight;
+        _Atemp(pj_start + iteration, pos_j) = -M_PI * edge_weight;
+        _Atemp(pj_start + iteration, pj_start + iteration) = (pow(M_PI, 2) / 2) * edge_weight;
         iteration++;
     }
     gmm::clean(_Atemp, 1E-10);

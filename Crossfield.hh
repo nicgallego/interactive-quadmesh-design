@@ -15,6 +15,7 @@
 #include <ACG/Utils/ColorCoder.hh>
 #include <CoMISo/Solver/ConstrainedSolver.hh>
 #include <gmm/gmm.h>
+#include <functional>
 #include <iostream>
 #include <vector>
 #include <float.h>
