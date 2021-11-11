@@ -58,15 +58,19 @@ private:
 
     void createCrossfields();
 
+    gmm::row_matrix<gmm::wsvector<double>> getConstraints(const std::map<int, double> &edgeKappa, const std::vector<int> &constrainedEdges, const std::vector<int> &faces);
+
+    std::vector<int> getIdxToRound(const std::map<int, double> &edgeKappa, const std::vector<int> &faces);
+
     std::vector<double> getRHS(const std::map<int, double> &edgeKappa, const std::vector<int> &faces);
 
-    gmm::csc_matrix<double> getMatrixA(const std::vector<int> &faces, const std::map<int, double> &edgeKappa);
+    gmm::col_matrix<gmm::wsvector<double>> getMatrixA(const std::vector<int> &faces, const std::map<int, double> &edgeKappa);
 
     std::map<int, double> getKappa(const std::vector<int> &faces);
 
     void setlocalCoordFrame(const std::vector<int> &faces);
 
-    std::vector<int> getBaryCenterAndRefEdge(const std::vector<int> &constrainedHEdges);
+    std::vector<int> getBaryCenterAndRefEdge(const std::vector<int> &constrainedEdges);
 
     std::vector<int> getConstraints();
 
