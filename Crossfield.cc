@@ -19,7 +19,6 @@ void Crossfield::createCrossfields() {
     std::vector<double> _rhs = getRHS(edgeKappa, faces);
     std::vector<int> _idx_to_round = getIdxToRound(edgeKappa, faces);
 
-    std::vector<double> _xOld = _x;
     std::vector<double> _rhsOld = _rhs;
     std::vector<int> _idx_to_roundOld = _idx_to_round;
 
@@ -37,10 +36,32 @@ void Crossfield::createCrossfields() {
               << "Size of edgeKappa:\t" << edgeKappa.size() << std::endl << "Size of idx:\t\t" << _idx_to_round.size()
               << std::endl;
     csolver.solve(_constraints, _A, _x, _rhs, _idx_to_round);
-    std::cout << _A << std::endl;
-    std::cout << _constraints << std::endl;
+//    double energy_before = getEnergy(edgeKappa, faces, _rhsOld, _x);
+//    double energy_after = getEnergy(edgeKappa, faces, _rhs, _x);
+//    std::cout << "The energy before the smoothing is:\t" << energy_before << std::endl
+//              << "The energy after the smoothing is:\t" << energy_after << std::endl;
     std::cout << "hello world\n";
 
+}
+
+double Crossfield::getEnergy(const std::map<int, double> &edgeKappa, const std::vector<int> &faces,
+                             const std::vector<double> &_rhs, const std::vector<double> &_x) {
+    int pj_start = faces.size();
+    double sum = 0.0;
+    for (auto i: edgeKappa) {
+
+        OpenMesh::HalfedgeHandle heh = trimesh_.halfedge_handle(i.first);
+        OpenMesh::HalfedgeHandle oheh = trimesh_.opposite_halfedge_handle(heh);
+        OpenMesh::FaceHandle fh = trimesh_.face_handle(heh);
+        OpenMesh::FaceHandle ofh = trimesh_.face_handle(oheh);
+        int position = trimesh_.property(pos_matrixA, fh);
+        int opposite_position = trimesh_.property(pos_matrixA, ofh);
+//        std::cout << "theta_i: " << _x[position] << std::endl << "kappa: " << _rhs[pj_start] << std::endl << "periodjump: "
+//                  << _x[pj_start] << std::endl << "theta_j: " << _x[opposite_position] << std::endl;
+        sum += pow((_x[position] + _rhs[pj_start] + (M_PI / 2 * _x[pj_start]) - _x[opposite_position]), 2);
+        pj_start++;
+    }
+    return sum;
 }
 
 gmm::row_matrix<gmm::wsvector<double>>
@@ -61,12 +82,11 @@ Crossfield::getConstraints(const std::map<int, double> &edgeKappa, const std::ve
         OpenMesh::HalfedgeHandle hehRef = trimesh_.halfedge_handle(idx);
         _constraints(counter, position) = 1.0;
         if (hehCons.idx() == hehRef.idx())
-            _constraints(counter, n_col) = 0;
+            _constraints(counter, n_col) = -1 * 0;
         if (hehCons.idx() == trimesh_.prev_halfedge_handle(hehRef).idx())
-            //TODO condition is incompatible with solver
-            _constraints(counter, n_col) = trimesh_.calc_sector_angle(hehCons);
+            _constraints(counter, n_col) = -1 * trimesh_.calc_sector_angle(hehCons);
         if (hehCons.idx() == trimesh_.next_halfedge_handle(hehRef).idx())
-            _constraints(counter, n_col) = trimesh_.calc_sector_angle(hehRef);
+            _constraints(counter, n_col) = -1 * trimesh_.calc_sector_angle(hehRef);
         counter++;
     }
     gmm::clean(_constraints, 1E-10);
@@ -77,18 +97,15 @@ Crossfield::getConstraints(const std::map<int, double> &edgeKappa, const std::ve
 
 std::vector<int> Crossfield::getIdxToRound(const std::map<int, double> &edgeKappa, const std::vector<int> &faces) {
     std::vector<int> _idx_to_round;
-    for (const auto &i: edgeKappa) {
-        OpenMesh::HalfedgeHandle heh = trimesh_.halfedge_handle(i.first);
-        OpenMesh::EdgeHandle eh = trimesh_.edge_handle(heh);
-        _idx_to_round.push_back(eh.idx());
-    }
+    int pj_start = faces.size();
+    for (const auto &i: edgeKappa)
+        _idx_to_round.push_back(pj_start++);
     return _idx_to_round;
 }
 
 std::vector<double> Crossfield::getRHS(const std::map<int, double> &edgeKappa, const std::vector<int> &faces) {
     std::vector<double> _rhs(faces.size() + edgeKappa.size());
-    double totalArea = getTotalArea(faces);
-    double edge_weight = 1;
+    double totalArea = getTotalArea(faces), edge_weight = 0.0;
     int facesPlusOne = faces.size();
     for (int i: faces) {
         double sum = 0;
@@ -101,17 +118,17 @@ std::vector<double> Crossfield::getRHS(const std::map<int, double> &edgeKappa, c
                 opposite_fh = trimesh_.face_handle(trimesh_.opposite_halfedge_handle(*fh_it));
                 edge_weight =
                         ((trimesh_.calc_face_area(fh) / 3) + (trimesh_.calc_face_area(opposite_fh) / 3)) / totalArea;
-            }
-            auto it = edgeKappa.find(fh_it->idx());
-            auto it2 = edgeKappa.find(opposite_heh.idx());
-            // it doesn't matter that edge_weight doesn't have a value, since this condition is never true, if edge_weight is valueless
-            if (it != edgeKappa.end())
-                sum += (it->second * edge_weight);
-            if (it2 != edgeKappa.end())
-                sum -= (it2->second * edge_weight);
-            if (it != edgeKappa.end() && it2 != edgeKappa.end()) {
-                throw std::runtime_error(
-                        "Opposite Halfedges can't both be in edgeKappa!\n");
+                auto it = edgeKappa.find(fh_it->idx());
+                auto it2 = edgeKappa.find(opposite_heh.idx());
+                // it doesn't matter that edge_weight doesn't have a value, since this condition is never true, if edge_weight is valueless
+                if (it != edgeKappa.end())
+                    sum += (it->second * edge_weight);
+                else if (it2 != edgeKappa.end())
+                    sum -= (it2->second * edge_weight);
+                else if (it != edgeKappa.end() && it2 != edgeKappa.end()) {
+                    throw std::runtime_error(
+                            "Opposite Halfedges can't both be in edgeKappa!\n");
+                }
             }
         }
         int position = trimesh_.property(pos_matrixA, fh);
@@ -168,18 +185,17 @@ Crossfield::getMatrixA(const std::vector<int> &faces, const std::map<int, double
         // | -2*w_ij    2*w_ij    -pi*w_ij |
         // | pi*w_ij  -pi*w_ij pi^2/2*w_ij |
         _A(pos_i, pos_i) = 2.0 * edge_weight;
-        _A(pos_i, pos_j) = -2.0 * edge_weight;
-        _A(pos_i, pj_start + iteration) = M_PI * edge_weight;
-        _A(pos_j, pos_i) = -2.0 * edge_weight;
         _A(pos_j, pos_j) = 2.0 * edge_weight;
-        _A(pos_j, pj_start + iteration) = -M_PI * edge_weight;
+        _A(pos_i, pos_j) = -2.0 * edge_weight;
+        _A(pos_j, pos_i) = -2.0 * edge_weight;
+        _A(pos_i, pj_start + iteration) = M_PI * edge_weight;
         _A(pj_start + iteration, pos_i) = M_PI * edge_weight;
+        _A(pos_j, pj_start + iteration) = -M_PI * edge_weight;
         _A(pj_start + iteration, pos_j) = -M_PI * edge_weight;
         _A(pj_start + iteration, pj_start + iteration) = (pow(M_PI, 2) / 2) * edge_weight;
         iteration++;
     }
     gmm::clean(_A, 1E-10);
-    std::cout << _A << std::endl;
     return _A;
 }
 
@@ -425,7 +441,7 @@ std::vector<int> Crossfield::getConstraints() {
 }
 
 double Crossfield::getTotalArea(const std::vector<int> &faces) {
-    double totalarea = 0;
+    double totalarea = 0.0;
     for (int i: faces)
         totalarea += trimesh_.calc_face_area(trimesh_.face_handle(i));
     return totalarea;

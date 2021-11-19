@@ -58,13 +58,20 @@ private:
 
     void createCrossfields();
 
-    gmm::row_matrix<gmm::wsvector<double>> getConstraints(const std::map<int, double> &edgeKappa, const std::vector<int> &constrainedEdges, const std::vector<int> &faces);
+    double
+    getEnergy(const std::map<int, double> &edgeKappa, const std::vector<int> &faces, const std::vector<double> &_rhs,
+              const std::vector<double> &_x);
+
+    gmm::row_matrix<gmm::wsvector<double>>
+    getConstraints(const std::map<int, double> &edgeKappa, const std::vector<int> &constrainedEdges,
+                   const std::vector<int> &faces);
 
     std::vector<int> getIdxToRound(const std::map<int, double> &edgeKappa, const std::vector<int> &faces);
 
     std::vector<double> getRHS(const std::map<int, double> &edgeKappa, const std::vector<int> &faces);
 
-    gmm::col_matrix<gmm::wsvector<double>> getMatrixA(const std::vector<int> &faces, const std::map<int, double> &edgeKappa);
+    gmm::col_matrix<gmm::wsvector<double>>
+    getMatrixA(const std::vector<int> &faces, const std::map<int, double> &edgeKappa);
 
     std::map<int, double> getKappa(const std::vector<int> &faces);
 
@@ -74,7 +81,7 @@ private:
 
     std::vector<int> getConstraints();
 
-    double  getTotalArea(const std::vector<int> &faces);
+    double getTotalArea(const std::vector<int> &faces);
 
     OpenMesh::FPropHandleT<TriMesh::Color> face_color;
     OpenMesh::FPropHandleT<int> pos_matrixA;
