@@ -82,11 +82,11 @@ Crossfield::getConstraints(const std::map<int, double> &edgeKappa, const std::ve
         OpenMesh::HalfedgeHandle hehRef = trimesh_.halfedge_handle(idx);
         _constraints(counter, position) = 1.0;
         if (hehCons.idx() == hehRef.idx())
-            _constraints(counter, n_col) = -1 * 0;
+            _constraints(counter, n_col) = -1.0 * 0;
         if (hehCons.idx() == trimesh_.prev_halfedge_handle(hehRef).idx())
-            _constraints(counter, n_col) = -1 * trimesh_.calc_sector_angle(hehCons);
+            _constraints(counter, n_col) = -1.0 * trimesh_.calc_sector_angle(hehCons);
         if (hehCons.idx() == trimesh_.next_halfedge_handle(hehRef).idx())
-            _constraints(counter, n_col) = -1 * trimesh_.calc_sector_angle(hehRef);
+            _constraints(counter, n_col) = -1.0 * trimesh_.calc_sector_angle(hehRef);
         counter++;
     }
     gmm::clean(_constraints, 1E-10);
@@ -265,9 +265,7 @@ std::map<int, double> Crossfield::getKappa(const std::vector<int> &faces) {
                             "Something went wrong, there needs to be a ref edge in the main triangle!\n");
                 }
                 // if opposite halfedge isn't in edgeKappa add it else do nothing
-                if (edgeKappa.find(
-                        trimesh_.opposite_halfedge_handle(trimesh_.halfedge_handle(commonEdge.first)).idx()) ==
-                    edgeKappa.end()) {
+                if (edgeKappa.find(commonEdge.second) == edgeKappa.end()) {
                     kappa = (alpha + beta);
                     int edgeIndex = commonEdge.first;
                     edgeKappa[edgeIndex] = kappa;
@@ -332,20 +330,19 @@ std::vector<int> Crossfield::getBaryCenterAndRefEdge(const std::vector<int> &con
     // assign constraint edges to their faces
     for (int i: constrainedEdges) {
         Point bCenter = {0, 0, 0};
-        int valence = 0;
+        int valence = 3;
         OpenMesh::EdgeHandle eh = trimesh_.edge_handle(i);
         // get random halfedge
         OpenMesh::HalfedgeHandle heh = trimesh_.halfedge_handle(eh, 1);
         if (trimesh_.is_boundary(heh))
             heh = trimesh_.opposite_halfedge_handle(heh);
         OpenMesh::FaceHandle fh = trimesh_.face_handle(heh);
-        for (auto fv_it = trimesh_.fv_iter(fh); fv_it.is_valid(); ++fv_it) {
+        for (auto fv_it = trimesh_.fv_iter(fh); fv_it.is_valid(); ++fv_it)
             bCenter += trimesh_.point(*fv_it);
-            ++valence;
-        }
         if (!trimesh_.status(heh).tagged() && !trimesh_.status(fh).tagged()) {
             // add barycenter to face
-            trimesh_.property(barycenter, fh) = (bCenter / valence);
+            bCenter /= valence;
+            trimesh_.property(barycenter, fh) = bCenter;
             // add reference edge to face
             trimesh_.property(reference_HEdge, fh) = {trimesh_.calc_edge_vector(heh), heh.idx()};
             // set face and edge as used
@@ -373,7 +370,8 @@ std::vector<int> Crossfield::getBaryCenterAndRefEdge(const std::vector<int> &con
                 bCenter += trimesh_.point(*fv_it);
                 ++valence;
             }
-            trimesh_.property(barycenter, fh) = (bCenter / valence);
+            bCenter /= valence;
+            trimesh_.property(barycenter, fh) = bCenter;
             trimesh_.property(reference_HEdge, fh) = {trimesh_.calc_edge_vector(heh), heh.idx()};
             // both halfedges need to be tagged, else it is possible opposite faces share an edge
             trimesh_.status(heh).set_tagged(true);
@@ -402,8 +400,8 @@ std::vector<int> Crossfield::getConstraints() {
                 OpenMesh::HalfedgeHandle heh = trimesh_.find_halfedge(vhj, vh);
                 // avoids duplicates with std::find
                 if (heh.is_valid() &&
-                    !(std::find(constraints.begin(), constraints.end(), trimesh_.edge_handle(heh).idx()) !=
-                      constraints.end())) {
+                    std::find(constraints.begin(), constraints.end(), trimesh_.edge_handle(heh).idx()) ==
+                    constraints.end()) {
                     constraints.push_back(trimesh_.edge_handle(heh).idx());
                 }
             }
@@ -413,7 +411,7 @@ std::vector<int> Crossfield::getConstraints() {
     if (!selectedEdges.empty()) {
         for (int i: selectedEdges) {
             // avoids duplicates with std::find
-            if (!(std::find(constraints.begin(), constraints.end(), i) != constraints.end()))
+            if (std::find(constraints.begin(), constraints.end(), i) == constraints.end())
                 constraints.push_back(i);
         }
     }
@@ -422,7 +420,7 @@ std::vector<int> Crossfield::getConstraints() {
         for (int i: selectedHEdges) {
             OpenMesh::EdgeHandle eh = trimesh_.edge_handle(trimesh_.halfedge_handle(i));
             // avoids duplicates with std::find
-            if (!(std::find(constraints.begin(), constraints.end(), eh.idx()) != constraints.end()))
+            if (std::find(constraints.begin(), constraints.end(), eh.idx()) == constraints.end())
                 constraints.push_back(eh.idx());
         }
     }
@@ -432,7 +430,7 @@ std::vector<int> Crossfield::getConstraints() {
             OpenMesh::FaceHandle fh = trimesh_.face_handle(i);
             for (auto fe_it = trimesh_.fe_iter(fh); fe_it.is_valid(); ++fe_it) {
                 // avoids duplicates with std::find
-                if (!(std::find(constraints.begin(), constraints.end(), fe_it->idx()) != constraints.end()))
+                if (std::find(constraints.begin(), constraints.end(), fe_it->idx()) == constraints.end())
                     constraints.push_back(fe_it->idx());
             }
         }
