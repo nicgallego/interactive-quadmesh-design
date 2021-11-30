@@ -6,12 +6,13 @@
 #define OPENFLIPPER_CROSSFIELD_HH
 
 #include <ObjectTypes/TriangleMesh/TriangleMesh.hh>
+#include <OpenMesh/Core/Utils/Property.hh>
 #include <ObjectTypes/PolyMesh/PolyMesh.hh>
 #include <OpenMesh/Core/Mesh/PolyMesh_ArrayKernelT.hh>
 #include <OpenMesh/Core/IO/MeshIO.hh>
 #include <MeshTools/MeshSelectionT.hh>
 #include <ACG/Geometry/Types/PlaneT.hh>
-#include <ACG/Scenegraph/LineNode.hh>
+#include <ACG/Scenegraph/TransformNode.hh>
 #include <ACG/Utils/ColorCoder.hh>
 #include <CoMISo/Solver/ConstrainedSolver.hh>
 #include <gmm/gmm.h>
@@ -23,9 +24,10 @@
 class Crossfield {
 public:
     using Point = ACG::Vec3d;
+public:
 
     /*
-     * is the same as:
+     * is the same as:>
      * Crossfield(TriMesh &trimesh, std::vector<int> &heInRange) {
      *      trimesh_ = trimesh;
      *      heInRange_ = heInRange;
@@ -33,22 +35,28 @@ public:
      */
     Crossfield(TriMesh &trimesh, std::vector<int> &heInRange)
             : trimesh_{trimesh}, heInRange_{heInRange} {
-        trimesh.add_property(associatedFace, "Edge already associated with a Face");
-        trimesh.add_property(face_color, "halfedge color");
-        trimesh.add_property(pos_matrixA, "row position of face in matrix A");
-        trimesh.add_property(barycenter, "Barycenter of each Face");
-        trimesh.add_property(reference_HEdge, "Edge associated with face, used for local coord sys");
+        trimesh_.add_property(theta, "angle to rotate");
+        trimesh_.add_property(face_color, "Face");
+        trimesh_.add_property(heh_color, "Halfedge");
+        trimesh_.add_property(x_axis, "x axis of local coord system");
+        trimesh_.add_property(y_axis, "y axis of local coord system");
+        trimesh_.add_property(x_axis_r, "x axis of local coord system rotated");
+        trimesh_.add_property(y_axis_r, "y axis of local coord system rotated");
+        trimesh_.add_property(pos_matrixA, "position matrix A");
+        trimesh_.add_property(reference_HEdge, "halfedge, x-axis local coord sys");
     }
 
     ~Crossfield() {
-        trimesh_.remove_property(associatedFace);
-        trimesh_.remove_property(face_color);
-        trimesh_.remove_property(pos_matrixA);
-        trimesh_.remove_property(barycenter);
-        trimesh_.remove_property(reference_HEdge);
+//        trimesh_.remove_property(face_color);
+//        trimesh_.remove_property(pos_matrixA);
+//        trimesh_.remove_property(barycenter);
+//        trimesh_.remove_property(reference_HEdge);
+//        trimesh_.remove_property(x_axis);
+//        trimesh_.remove_property(y_axis);
+//        trimesh_.remove_property(x_axis_r);
+//        trimesh_.remove_property(y_axis_r);
+//        trimesh_.remove_property(theta);
     }
-
-public:
 
     void getCrossfield();
 
@@ -77,20 +85,34 @@ private:
 
     void setlocalCoordFrame(const std::vector<int> &faces);
 
+    void rotateLocalCoordFrame(const std::vector<int> &faces, const std::vector<double> _x);
+
+    void colorFaces(const std::vector<int> &faces);
+
+    void colorHEdges(const std::vector<int> &constrainedEdges);
+
     std::vector<int> getBaryCenterAndRefEdge(const std::vector<int> &constrainedEdges);
 
     std::vector<int> getConstraints();
 
     double getTotalArea(const std::vector<int> &faces);
 
-    OpenMesh::FPropHandleT<TriMesh::Color> face_color;
-    OpenMesh::FPropHandleT<int> pos_matrixA;
-    OpenMesh::FPropHandleT<std::pair<Point, int>> reference_HEdge;
-    OpenMesh::FPropHandleT<Point> barycenter;
-    OpenMesh::EPropHandleT<bool> associatedFace;
+    void removeProperties ();
+
 
     TriMesh &trimesh_;
     std::vector<int> &heInRange_;
+
+    OpenMesh::FPropHandleT<int> face_color;
+    OpenMesh::FPropHandleT<int> pos_matrixA;
+    OpenMesh::FPropHandleT<int> reference_HEdge;
+    OpenMesh::FPropHandleT<Point> x_axis;
+    OpenMesh::FPropHandleT<Point> y_axis;
+    OpenMesh::FPropHandleT<Point> x_axis_r;
+    OpenMesh::FPropHandleT<Point> y_axis_r;
+    OpenMesh::FPropHandleT<double> theta;
+    OpenMesh::HPropHandleT<int> heh_color;
+
 };
 
 
