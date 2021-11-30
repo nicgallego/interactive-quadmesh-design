@@ -1,6 +1,8 @@
 #include "DijkstraDistance.hh"
 
 std::vector<int> DijkstraDistance::calculateDijkstra(const double refDist) {
+    trimesh_.release_vertex_status();
+    trimesh_.request_vertex_status();
     std::vector<int> constrainedVertices;
     std::vector<int> includedVertices;
 
@@ -13,12 +15,12 @@ std::vector<int> DijkstraDistance::calculateDijkstra(const double refDist) {
         if (vertexIndex == DBL_MAX)
             break;
         OpenMesh::VertexHandle vh = trimesh_.vertex_handle(vertexIndex);
-        trimesh_.property(visited, vh) = true;
+        trimesh_.status(vh).set_tagged(true);
         includedVertices.push_back(vh.idx());
         for (auto voh_it = trimesh_.voh_iter(vh); voh_it.is_valid(); ++voh_it) {
             OpenMesh::VertexHandle vh_neighbour = trimesh_.to_vertex_handle(*voh_it);
             totEdgeLen = trimesh_.property(distance, vh) + trimesh_.calc_edge_length(*voh_it);
-            if (!trimesh_.property(visited, vh_neighbour) && totEdgeLen < trimesh_.property(distance, vh_neighbour))
+            if (!trimesh_.status(vh_neighbour).tagged() && totEdgeLen < trimesh_.property(distance, vh_neighbour))
                 trimesh_.property(distance, vh_neighbour) = totEdgeLen;
         }
     }
@@ -100,7 +102,7 @@ double DijkstraDistance::getSmallestDistPropVertex(std::vector<int> &allVertices
     double anyVertex = DBL_MAX;
     for (int i: allVertices) {
         OpenMesh::VertexHandle vh = trimesh_.vertex_handle(i);
-        if (!trimesh_.property(visited, vh) &&
+        if (!trimesh_.status(vh).tagged() &&
             trimesh_.property(distance, vh) < minDistance &&
             trimesh_.property(distance, vh) < refDist) {
             minDistance = trimesh_.property(distance, vh);
@@ -122,7 +124,6 @@ void DijkstraDistance::initializeDistanceProperty(std::vector<int> &constrainedV
     // give all vertices the property "distance" with infiniteDistance
     for (OpenMesh::VertexHandle vh: trimesh_.vertices()) {
         trimesh_.property(distance, vh) = infiniteDistance;
-        trimesh_.property(visited, vh) = false;
     };
     if (!selectedVertices.empty())
         initializeSelectedVertices(selectedVertices, zeroDistance);

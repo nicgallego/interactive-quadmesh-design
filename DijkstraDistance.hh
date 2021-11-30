@@ -18,14 +18,12 @@ public:
         trimesh_.request_edge_colors();
         // add properties to mesh and give them a name
         trimesh_.add_property(edge_color, "edge_color");
-        trimesh_.add_property(distance, "distance to origin");
-        trimesh_.add_property(visited, "vertex already visited");
+        trimesh_.add_property(distance, "dijkstra distance to starting point");
     }
 
     ~DijkstraDistance() {
         trimesh_.remove_property(edge_color);
         trimesh_.remove_property(distance);
-        trimesh_.remove_property(visited);
     }
 
 public:
@@ -45,7 +43,6 @@ private:
     // define properties
     OpenMesh::EPropHandleT<TriMesh::Color> edge_color;
     OpenMesh::VPropHandleT<double> distance;
-    OpenMesh::VPropHandleT<bool> visited;
 
     double getSmallestDistPropVertex(std::vector<int> &allVertices, const double refDist);
 
