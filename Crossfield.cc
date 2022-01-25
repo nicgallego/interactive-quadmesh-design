@@ -45,12 +45,12 @@ void Crossfield::createCrossfields() {
     rotateLocalCoordFrame(faces, _x);
 
     for (std::size_t i = 0, max = _x.size(); i != max; ++i) {
-        std::cout << "x position " << i << " with value: " << _x[i] << std::endl;
+        std::cout << "_x position (" << i << ") with value: " << _x[i] << std::endl;
     }
 
     std::cout << "A (after): " << _A << std::endl;
     for (std::size_t i = 0, max = _rhs.size(); i != max; ++i) {
-        std::cout << "rhs position (" << i << ") with value (after calc): " << _rhs[i] << std::endl;
+        std::cout << "_rhs position (" << i << ") with value (after calc): " << _rhs[i] << std::endl;
     }
 
     std::cout << "constraints after: " << _constraints << std::endl;
@@ -67,10 +67,9 @@ double Crossfield::getEnergy(const std::map<int, double> &edgeKappa, const std::
     int pj_start = faces.size();
     double sum = 0.0;
     for (auto i: edgeKappa) {
-
         OpenMesh::HalfedgeHandle heh = trimesh_.halfedge_handle(i.first);
-        OpenMesh::HalfedgeHandle oheh = trimesh_.opposite_halfedge_handle(heh);
         OpenMesh::FaceHandle fh = trimesh_.face_handle(heh);
+        OpenMesh::HalfedgeHandle oheh = trimesh_.opposite_halfedge_handle(heh);
         OpenMesh::FaceHandle ofh = trimesh_.face_handle(oheh);
         int position = trimesh_.property(pos_matrixA, fh);
         int opposite_position = trimesh_.property(pos_matrixA, ofh);
@@ -84,35 +83,36 @@ double Crossfield::getEnergy(const std::map<int, double> &edgeKappa, const std::
 }
 
 gmm::row_matrix<gmm::wsvector<double>>
-Crossfield::getConstraintMatrix(const std::map<int, double> &edgeKappa, const std::vector<int> &constrainedHalfEdges,
+Crossfield::getConstraintMatrix(const std::map<int, double> &edgeKappa, const std::vector<int> &constraintHalfEdges,
                                 const std::vector<int> &faces) {
     //cNplusOne = angle between local coordinate x-axis and constraint
     int cNplusOne = 1, counter = 0;
     // this results in have the rows of the constrainedhalfedges
-    std::vector<int> constrainedEdges = getConstrainedEdges(constrainedHalfEdges);
-    int n_row = constrainedEdges.size(), n_col = edgeKappa.size() + faces.size();
+    std::vector<int> constraintEdges = getConstraintEdges(constraintHalfEdges);
+    int n_row = constraintEdges.size(), n_col = edgeKappa.size() + faces.size();
     gmm::row_matrix<gmm::wsvector<double>> _constraints(n_row, n_col + cNplusOne);
-    for (int i: constrainedEdges) {
-        OpenMesh::HalfedgeHandle hehCons = trimesh_.halfedge_handle(i);
+    for (int i: constraintEdges) {
+        // what if edge is between faces, do both faces get a 1 in their respective position in the row of the matrix
+        OpenMesh::EdgeHandle eh = trimesh_.edge_handle(i);
+        OpenMesh::HalfedgeHandle hehCons = trimesh_.halfedge_handle(eh, 0);
         if (trimesh_.is_boundary(hehCons)) {
-
-        } else {
-
-            OpenMesh::FaceHandle fh = trimesh_.face_handle(hehCons);
-            double constraint = trimesh_.property(constraint_angle, fh);
-            int position = trimesh_.property(pos_matrixA, fh);
-            int idx = trimesh_.property(referenceHeIdx, fh);
-            OpenMesh::HalfedgeHandle hehRef = trimesh_.halfedge_handle(idx);
-            _constraints(counter, position++) = 1.0;
-            _constraints(counter, n_col) = constraint;
-//        if (hehCons.idx() == hehRef.idx())
-//            _constraints(counter, n_col) = -1.0 * 0;
-//        if (hehCons.idx() == trimesh_.prev_halfedge_handle(hehRef).idx())
-//            _constraints(counter, n_col) = -1.0 * trimesh_.calc_sector_angle(hehCons);
-//        if (hehCons.idx() == trimesh_.next_halfedge_handle(hehRef).idx())
-//            _constraints(counter, n_col) = -1.0 * trimesh_.calc_sector_angle(hehRef);
-            counter++;
+            hehCons = trimesh_.opposite_halfedge_handle(hehCons);
         }
+        OpenMesh::FaceHandle fh = trimesh_.face_handle(hehCons);
+        double constraint = trimesh_.property(constraint_angle, fh);
+        int position = trimesh_.property(pos_matrixA, fh);
+        int idx = trimesh_.property(referenceHeIdx, fh);
+        OpenMesh::HalfedgeHandle hehRef = trimesh_.halfedge_handle(idx);
+        //TODO needs to be looked at again
+        _constraints(counter, position) = 1.0;
+//        _constraints(counter, n_col) = constraint;
+        if (hehCons.idx() == hehRef.idx())
+            _constraints(counter, n_col) = -1.0 * constraint;
+        if (hehCons.idx() == trimesh_.prev_halfedge_handle(hehRef).idx())
+            _constraints(counter, n_col) = -1.0 * trimesh_.calc_sector_angle(hehCons) + constraint;
+        if (hehCons.idx() == trimesh_.next_halfedge_handle(hehRef).idx())
+            _constraints(counter, n_col) = -1.0 * trimesh_.calc_sector_angle(hehRef) + constraint;
+        counter++;
     }
     gmm::clean(_constraints, 1E-10);
     std::cout << "We have a matrix with " << gmm::mat_nrows(_constraints) <<
@@ -120,7 +120,7 @@ Crossfield::getConstraintMatrix(const std::map<int, double> &edgeKappa, const st
     return _constraints;
 }
 
-std::vector<int> Crossfield::getConstrainedEdges(const std::vector<int> &constrainedHEdges) {
+std::vector<int> Crossfield::getConstraintEdges(const std::vector<int> &constrainedHEdges) {
     std::vector<int> edges;
     for (int i: constrainedHEdges) {
         OpenMesh::HalfedgeHandle heh = trimesh_.halfedge_handle(i);
@@ -130,7 +130,7 @@ std::vector<int> Crossfield::getConstrainedEdges(const std::vector<int> &constra
         }
     };
     std::cout << "The constrained Edge vector has the size of:\t" << edges.size()
-              << "\nwhile the Halfedge vector has the size of:\t" << constrainedHEdges.size() << std::endl;
+              << "\nwhile the Halfedge vector has the size of:\t\t" << constrainedHEdges.size() << std::endl;
     return edges;
 }
 
@@ -144,50 +144,76 @@ std::vector<int> Crossfield::getIdxToRound(const std::map<int, double> &edgeKapp
 
 std::vector<double> Crossfield::getRHS(const std::map<int, double> &edgeKappa, const std::vector<int> &faces) {
     std::vector<double> _rhs(faces.size() + edgeKappa.size());
-    double totalArea = getTotalArea(faces), edge_weight = DBL_MAX, sum = DBL_MAX;
+    double totalArea = getTotalArea(faces);
     int facesPlusOne = faces.size();
-    for (int i: faces) {
-        sum = 0;
-        OpenMesh::FaceHandle fh = trimesh_.face_handle(i);
-        for (auto fh_it = trimesh_.fh_iter(fh); fh_it.is_valid(); ++fh_it) {
-            OpenMesh::HalfedgeHandle opposite_heh = trimesh_.opposite_halfedge_handle(*fh_it);
-            OpenMesh::SmartFaceHandle opposite_fh;
-            // this condition is necessary because an opposite face doesn't exist if the opposite heh is boundary
-            if (!trimesh_.is_boundary(opposite_heh)) {
-                opposite_fh = trimesh_.face_handle(trimesh_.opposite_halfedge_handle(*fh_it));
-                edge_weight = 1;
-//                edge_weight =((trimesh_.calc_face_area(fh) / 3) + (trimesh_.calc_face_area(opposite_fh) / 3)) / totalArea;
-                auto it = edgeKappa.find(fh_it->idx());
-                auto it2 = edgeKappa.find(opposite_heh.idx());
-                // TODO check calculations here. not sure if they are correct
-                // it doesn't matter that edge_weight doesn't have a value, since this condition is never true,
-                // if edge_weight is valueless
-                if (it != edgeKappa.end() && it2 != edgeKappa.end()) {
-                    sum += (it->second * edge_weight);
-                } else if (it2 != edgeKappa.end()) {
-                    sum -= (it2->second * edge_weight);
-                }
 
-//                else if (it != edgeKappa.end() && it2 != edgeKappa.end()) {
-//                    throw std::runtime_error(
-//                            "Opposite Halfedges can't both be in edgeKappa!\n");
-//                }
-            }
-        }
-        int position = trimesh_.property(pos_matrixA, fh);
-        _rhs[position] = sum;
+    getRhsFirstHalf(totalArea, faces, _rhs, edgeKappa);
+    getRhsSecondHalf(totalArea, _rhs, edgeKappa, facesPlusOne);
+
+    // scalar multiplication with vector, b*-1 = -b
+    gmm::scale(_rhs, -1.0);
+    return _rhs;
+}
+
+void Crossfield::getRhsFirstHalf(double const totalArea, const std::vector<int> &faces, std::vector<double> &_rhs,
+                                 const std::map<int, double> &edgeKappa) {
+    for (int i: faces) {
+        getSum(totalArea, i, _rhs, edgeKappa);
     }
+}
+
+void Crossfield::getSum(double const totalArea, const int i, std::vector<double> &_rhs,
+                        const std::map<int, double> &edgeKappa) {
+    double sum = 0;
+    OpenMesh::FaceHandle fh = trimesh_.face_handle(i);
+    for (auto fh_it = trimesh_.fh_iter(fh); fh_it.is_valid(); ++fh_it) {
+        // this condition is necessary because an opposite face doesn't exist if the opposite heh is boundary
+        sum += setSum(fh, *fh_it, edgeKappa, totalArea);
+        std::cout << "sum: " << sum << std::endl;
+    }
+    int position = trimesh_.property(pos_matrixA, fh);
+    _rhs[position] = sum;
+}
+
+double
+Crossfield::setSum(OpenMesh::FaceHandle fh, OpenMesh::HalfedgeHandle fh_it, const std::map<int, double> &edgeKappa,
+                   double const totalArea) {
+    double sum = 0;
+    OpenMesh::HalfedgeHandle opposite_heh = trimesh_.opposite_halfedge_handle(fh_it);
+    if (!trimesh_.is_boundary(opposite_heh)) {
+        OpenMesh::FaceHandle opposite_fh = trimesh_.face_handle(trimesh_.opposite_halfedge_handle(fh_it));
+        double edge_weight = 1;
+//                edge_weight =((trimesh_.calc_face_area(fh) / 3) + (trimesh_.calc_face_area(opposite_fh) / 3)) / totalArea;
+        auto it = edgeKappa.find(fh_it.idx());
+        auto it2 = edgeKappa.find(opposite_heh.idx());
+        // it doesn't matter that edge_weight doesn't have a value, since this condition is never true,
+        // if edge_weight is valueless
+        if (it != edgeKappa.end()) {
+            sum += (it->second * edge_weight);
+//            std::cout << "Kappa value main triangle: " << it->second << "\nsum main:\t" << sum << std::endl;
+        }
+        if (it2 != edgeKappa.end()) {
+            sum -= (it2->second * edge_weight);
+//            std::cout << "Kappa value neighbour triangle: " << it2->second << "\nsum neigh:\t" << sum << std::endl;
+//        } else if (it != edgeKappa.end() && it2 != edgeKappa.end()) {
+//            throw std::runtime_error(
+//                    "Opposite Halfedges can't both be in edgeKappa!\n");
+        }
+    }
+    return sum;
+}
+
+void Crossfield::getRhsSecondHalf(double const totalArea, std::vector<double> &_rhs,
+                                  const std::map<int, double> &edgeKappa, const int facesPlusOne) {
+    int counter = facesPlusOne;
     for (const auto &i: edgeKappa) {
         OpenMesh::HalfedgeHandle heh = trimesh_.halfedge_handle(i.first);
         OpenMesh::FaceHandle fh = trimesh_.face_handle(heh);
         OpenMesh::FaceHandle opposite_fh = trimesh_.face_handle(trimesh_.opposite_halfedge_handle(heh));
-        edge_weight = 1;
+        double edge_weight = 1;
 //        edge_weight = ((trimesh_.calc_face_area(fh) / 3) + (trimesh_.calc_face_area(opposite_fh) / 3)) / totalArea;
-        _rhs[facesPlusOne++] = (i.second * edge_weight);
+        _rhs[counter++] = (i.second * edge_weight);
     }
-    // scalar multiplication with vector, b*-1 = -b
-    gmm::scale(_rhs, -1.0);
-    return _rhs;
 }
 
 gmm::col_matrix<gmm::wsvector<double>>
@@ -206,16 +232,8 @@ Crossfield::getMatrixA(const std::vector<int> &faces, const std::map<int, double
         OpenMesh::HalfedgeHandle heh = trimesh_.halfedge_handle(i.first);
         OpenMesh::FaceHandle fh1 = trimesh_.face_handle(heh);
         OpenMesh::FaceHandle fh2 = trimesh_.face_handle(trimesh_.opposite_halfedge_handle(heh));
-        if (!trimesh_.status(fh1).tagged()) {
-            trimesh_.property(pos_matrixA, fh1) = counter;
-            trimesh_.status(fh1).set_tagged(true);
-            counter++;
-        }
-        if (!trimesh_.status(fh2).tagged()) {
-            trimesh_.property(pos_matrixA, fh2) = counter;
-            trimesh_.status(fh2).set_tagged(true);
-            counter++;
-        }
+        renumberFace(fh1, counter);
+        renumberFace(fh2, counter);
     }
     // fills up sparse column matrix _A
     for (const auto &i: edgeKappa) {
@@ -244,6 +262,14 @@ Crossfield::getMatrixA(const std::vector<int> &faces, const std::map<int, double
     return _A;
 }
 
+void Crossfield::renumberFace(OpenMesh::FaceHandle fh, int &counter) {
+    if (!trimesh_.status(fh).tagged()) {
+        trimesh_.property(pos_matrixA, fh) = counter;
+        trimesh_.status(fh).set_tagged(true);
+        counter++;
+    }
+}
+
 std::map<int, double> Crossfield::getMapHeKappa(const std::vector<int> &faces) {
     std::map<int, double> edgeKappa;
     for (int i: faces) {
@@ -253,7 +279,7 @@ std::map<int, double> Crossfield::getMapHeKappa(const std::vector<int> &faces) {
         }
     }
     if (edgeKappa.empty()) {
-        throw std::runtime_error("Something went wrong, edgeKappa Map can't be empty!\n");
+        throw std::runtime_error("getMapHeKappa: edgeKappa Map can't be empty!\n");
     }
     return edgeKappa;
 }
@@ -270,7 +296,7 @@ void Crossfield::getStatusNeigh(const OpenMesh::FaceHandle fh, const OpenMesh::F
         // get the common edge between the triangles
         commonEdge = getCommonEdgeBetweenTriangles(fh, fh_neigh, refEdgeMain, refEdgeNeigh);
         kappa = getKappa(refEdgeMain, refEdgeNeigh, commonEdge);
-        addKappaHeToMap(commonEdge, edgeKappa);
+        addKappaHeToMap(commonEdge, kappa, edgeKappa);
     }
 }
 
@@ -290,7 +316,7 @@ Crossfield::getCommonEdgeBetweenTriangles(const OpenMesh::FaceHandle fh, const O
     }
     END_LOOP:
     if (commonEdge.first == INT_MAX || commonEdge.second == INT_MAX) {
-        throw std::runtime_error("Something went wrong, commonEdge can't have the value INT_MAX!\n");
+        throw std::runtime_error("getCommonEdgeBetweenTriangles: commonEdge can't have the value INT_MAX!\n");
     }
     return commonEdge;
 }
@@ -299,11 +325,11 @@ double
 Crossfield::getKappa(const int refEdgeMain, const int refEdgeNeigh, const std::pair<int, int> commonEdge) {
     // there are 9 different scenarios on how reference edges can be placed in two adjacent triangles
     // refEdge shares common edge
-    double alpha = DBL_MAX, beta = alpha, kappa = alpha;
+    double alpha = 0.0, beta = alpha, kappa = alpha;
     if (refEdgeMain == commonEdge.first) {
-        alpha = 0;
+        alpha = 0.0;
         if (refEdgeNeigh == commonEdge.second)
-            beta = 0;
+            beta = 0.0;
         if (refEdgeNeigh ==
             trimesh_.prev_halfedge_handle(trimesh_.halfedge_handle(commonEdge.second)).idx())
             beta = trimesh_.calc_sector_angle(trimesh_.halfedge_handle(refEdgeNeigh));
@@ -316,7 +342,7 @@ Crossfield::getKappa(const int refEdgeMain, const int refEdgeNeigh, const std::p
                trimesh_.prev_halfedge_handle(trimesh_.halfedge_handle(commonEdge.first)).idx()) {
         alpha = trimesh_.calc_sector_angle(trimesh_.halfedge_handle(refEdgeMain));
         if (refEdgeNeigh == commonEdge.second)
-            beta = 0;
+            beta = 0.0;
         if (refEdgeNeigh ==
             trimesh_.prev_halfedge_handle(trimesh_.halfedge_handle(commonEdge.second)).idx())
             beta = M_PI - trimesh_.calc_sector_angle(trimesh_.halfedge_handle(refEdgeNeigh));
@@ -328,7 +354,7 @@ Crossfield::getKappa(const int refEdgeMain, const int refEdgeNeigh, const std::p
                trimesh_.next_halfedge_handle(trimesh_.halfedge_handle(commonEdge.first)).idx()) {
         alpha = trimesh_.calc_sector_angle(trimesh_.halfedge_handle(commonEdge.first));
         if (refEdgeNeigh == commonEdge.second)
-            beta = 0;
+            beta = 0.0;
         if (refEdgeNeigh ==
             trimesh_.prev_halfedge_handle(trimesh_.halfedge_handle(commonEdge.second)).idx())
             beta = trimesh_.calc_sector_angle(trimesh_.halfedge_handle(refEdgeNeigh));
@@ -341,10 +367,12 @@ Crossfield::getKappa(const int refEdgeMain, const int refEdgeNeigh, const std::p
     return kappa = alpha + beta;
 }
 
-void Crossfield::addKappaHeToMap(const std::pair<int, int> commonEdge, std::map<int, double> &edgeKappa) {
+void Crossfield::addKappaHeToMap(const std::pair<int, int> commonEdge, const double kappa,
+                                 std::map<int, double> &edgeKappa) {
     if (edgeKappa.find(commonEdge.second) == edgeKappa.end()) {
-        int edgeIndex = commonEdge.first;
-        edgeKappa[edgeIndex] = 0;
+        int RefHEdgeIndex = commonEdge.first;
+//        std::cout << "RefHEdgeIndex: " << RefHEdgeIndex << " kappa: " << kappa << std::endl;
+        edgeKappa[RefHEdgeIndex] = kappa;
     }
 }
 
@@ -394,7 +422,7 @@ void Crossfield::setFacesVecWithRefHe(const int i, int &temp, std::vector<int> &
 void Crossfield::setFacesVec(const int i, const int temp, std::vector<int> &faces) {
     OpenMesh::HalfedgeHandle heh = trimesh_.halfedge_handle(i);
     if (temp == INT_MAX) {
-        throw std::runtime_error("the temp value can't be INT MAX !\n");
+        throw std::runtime_error("setFacesVec: the temp value can't be INT MAX !\n");
     }
     if (trimesh_.is_boundary(heh))
         heh = trimesh_.opposite_halfedge_handle(heh);
@@ -405,7 +433,7 @@ void Crossfield::setFacesVec(const int i, const int temp, std::vector<int> &face
     // halfedges or faces which are already tagged, won't be used anymore, no duplicates are allowed
     if ((std::find(heInRange_.begin(), heInRange_.end(), nheh.idx()) != heInRange_.end()) &&
         (!trimesh_.status(heh).tagged() && !trimesh_.status(fh).tagged())) {
-        trimesh_.property(referenceHeIdx, fh) = temp;
+        trimesh_.property(referenceHeIdx, fh) = heh.idx();
         // both halfedges need to be tagged, else it is possible opposite faces share an edge
         trimesh_.status(heh).set_tagged(true);
         trimesh_.status(trimesh_.opposite_halfedge_handle(heh)).set_tagged(true);
@@ -487,14 +515,15 @@ void Crossfield::getSelectedFaces(std::vector<int> &constraints) {
 
 void Crossfield::setlocalCoordFrame(const std::vector<int> &faces) {
     for (int i: faces) {
+        //TODO needs to be looked at again
         OpenMesh::FaceHandle fh = trimesh_.face_handle(i);
         OpenMesh::HalfedgeHandle heh = trimesh_.halfedge_handle(trimesh_.property(referenceHeIdx, fh));
         Point a = trimesh_.calc_edge_vector(heh).normalize();
-        double temp1 = OpenMesh::dot(a, {1, 0, 0});
-        double temp2 = OpenMesh::dot(a, {0, 1, 0});
-        double alpha2 = std::atan2(temp2, temp1);
-        trimesh_.property(constraint_angle, fh) = alpha2;
-        std::cout << "theta_c (" << i << ") is: " << alpha2 * 180 / M_PI << "degrees." << std::endl;
+        double xComponent = OpenMesh::dot(a, {1, 0, 0});
+        double yComponent = OpenMesh::dot(a, {0, 1, 0});
+        double alpha = std::atan2(yComponent, xComponent);
+        trimesh_.property(constraint_angle, fh) = alpha;
+        std::cout << "theta_c (" << i << ") is: " << alpha * 180 / M_PI << " degrees." << std::endl;
         Point b = a % trimesh_.calc_face_normal(fh);
         trimesh_.property(xa, fh) = {1, 0, 0};
         trimesh_.property(ya, fh) = {0, 1, 0};
@@ -505,14 +534,19 @@ void Crossfield::setlocalCoordFrame(const std::vector<int> &faces) {
 
 void Crossfield::rotateLocalCoordFrame(const std::vector<int> &faces, const std::vector<double> _x) {
     for (int i: faces) {
+        //TODO needs to be looked at again
         OpenMesh::FaceHandle fh = trimesh_.face_handle(i);
         int position = trimesh_.property(pos_matrixA, fh);
         Point p_x = trimesh_.property(x_vec_field, fh);
         Point p_y = trimesh_.property(y_vec_field, fh);
-        double degrees = std::fmod(_x[position] * 180 / M_PI, 360);
-        std::cout << "face " << i << ": with angle: " << degrees << std::endl;
-        trimesh_.property(x_vec_field_r, fh) = p_x * cos(_x[position]) + p_y * sin(_x[position]);
-        trimesh_.property(y_vec_field_r, fh) = p_x * -sin(_x[position]) + p_y * cos(_x[position]);
+        double radians = std::fmod(_x[position], 2 * M_PI);
+        std::cout << "face (" << i << ") with (" << _x[position] << "): with angle: " << radians << "(rad) and "
+                  << radians * 180 / M_PI << "(deg)"
+                  << std::endl;
+        // check rotation
+
+        trimesh_.property(x_vec_field_r, fh) = p_x * cos(radians) - p_y * sin(radians);
+        trimesh_.property(y_vec_field_r, fh) = p_x * sin(radians) + p_y * cos(radians);
     }
 }
 

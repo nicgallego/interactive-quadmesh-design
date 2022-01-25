@@ -74,23 +74,40 @@ private:
               const std::vector<double> &_x);
 
     gmm::row_matrix<gmm::wsvector<double>>
-    getConstraintMatrix(const std::map<int, double> &edgeKappa, const std::vector<int> &constrainedEdges,
+    getConstraintMatrix(const std::map<int, double> &edgeKappa, const std::vector<int> &constraintHalfEdges,
                         const std::vector<int> &faces);
 
     std::vector<int> getIdxToRound(const std::map<int, double> &edgeKappa, const std::vector<int> &faces);
 
     std::vector<double> getRHS(const std::map<int, double> &edgeKappa, const std::vector<int> &faces);
 
+    void getRhsFirstHalf(double const totalArea, const std::vector<int> &faces, std::vector<double> &_rhs,
+                         const std::map<int, double> &edgeKappa);
+
+    void getSum(double const totalArea, const int i, std::vector<double> &_rhs, const std::map<int, double> &edgeKappa);
+
+    double setSum(OpenMesh::FaceHandle fh, OpenMesh::HalfedgeHandle fh_it, const std::map<int, double> &edgeKappa, double const totalArea);
+
+    void getRhsSecondHalf(double const totalArea, std::vector<double> &_rhs,
+                          const std::map<int, double> &edgeKappa, const int facesPlusOne);
+
     gmm::col_matrix<gmm::wsvector<double>>
     getMatrixA(const std::vector<int> &faces, const std::map<int, double> &edgeKappa);
 
+    void renumberFace(OpenMesh::FaceHandle fh, int &counter);
+
     std::map<int, double> getMapHeKappa(const std::vector<int> &faces);
 
-    void getStatusNeigh(const OpenMesh::FaceHandle fh, const OpenMesh::FaceHandle fh_neigh, std::map<int, double> &edgeKappa);
-    void addKappaHeToMap(const std::pair<int, int> commonEdge, std::map<int, double> &edgeKappa);
-    std::pair<int,int> getCommonEdgeBetweenTriangles(const OpenMesh::FaceHandle fh, const OpenMesh::FaceHandle fh_neigh, const int &refEdgeMain, const int &refEdgeNeigh);
-    double getKappa(const int refEdgeMain, const int refEdgeNeigh, const std::pair<int,int> commonEdge);
+    void getStatusNeigh(const OpenMesh::FaceHandle fh, const OpenMesh::FaceHandle fh_neigh,
+                        std::map<int, double> &edgeKappa);
 
+    void addKappaHeToMap(const std::pair<int, int> commonEdge, const double kappa, std::map<int, double> &edgeKappa);
+
+    std::pair<int, int>
+    getCommonEdgeBetweenTriangles(const OpenMesh::FaceHandle fh, const OpenMesh::FaceHandle fh_neigh,
+                                  const int &refEdgeMain, const int &refEdgeNeigh);
+
+    double getKappa(const int refEdgeMain, const int refEdgeNeigh, const std::pair<int, int> commonEdge);
 
     void setlocalCoordFrame(const std::vector<int> &faces);
 
@@ -118,7 +135,7 @@ private:
 
     double getTotalArea(const std::vector<int> &faces);
 
-    std::vector<int> getConstrainedEdges(const std::vector<int> &constrainedHEdges);
+    std::vector<int> getConstraintEdges(const std::vector<int> &constrainedHEdges);
 
     void removeProperties();
 
