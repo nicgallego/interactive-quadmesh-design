@@ -36,7 +36,7 @@ public:
     Crossfield(TriMesh &trimesh, std::vector<int> &heInRange)
             : trimesh_{trimesh}, heInRange_{heInRange} {
         trimesh_.add_property(theta, "angle to rotate");
-        trimesh_.add_property(face_color, "Face");
+        trimesh_.add_property(face_color, "Face color");
         trimesh_.add_property(constraint_angle, "angle constraint");
         trimesh_.add_property(heh_color, "Halfedge");
         trimesh_.add_property(xa, "x axis of local coord system");
@@ -86,7 +86,8 @@ private:
 
     void getSum(double const totalArea, const int i, std::vector<double> &_rhs, const std::map<int, double> &edgeKappa);
 
-    double setSum(OpenMesh::FaceHandle fh, OpenMesh::HalfedgeHandle fh_it, const std::map<int, double> &edgeKappa, double const totalArea);
+    double setSum(OpenMesh::FaceHandle fh, OpenMesh::HalfedgeHandle fh_it, const std::map<int, double> &edgeKappa,
+                  double const totalArea);
 
     void getRhsSecondHalf(double const totalArea, std::vector<double> &_rhs,
                           const std::map<int, double> &edgeKappa, const int facesPlusOne);
@@ -119,9 +120,9 @@ private:
 
     std::vector<int> getReferenceEdge(const std::vector<int> &constrainedHEdges);
 
-    void setFacesVecWithRefHe(const int i, int &temp, std::vector<int> &faces);
+    void setFacesVecWithRefHe(const int i, std::vector<int> &faces);
 
-    void setFacesVec(const int i, const int temp, std::vector<int> &faces);
+    void setFacesVec(const int i, std::vector<int> &faces);
 
     std::vector<int> getConstraints();
 
