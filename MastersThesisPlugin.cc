@@ -34,6 +34,7 @@ void MastersThesisPlugin::slot_get_boundary() {
             if (inclBoundaryF)
                 mesh.includeBoundaryFaces(includedVertices, refDist);
             includedHEdges = mesh.getHEinRange(includedVertices, refDist, inclBoundaryF);
+            mesh.getDualGraphDijkstra(includedHEdges);
             mesh.colorizeEdges(includedHEdges);
             // change layer of display
             PluginFunctions::triMeshObject(*o_it)->meshNode()->drawMode(ACG::SceneGraph::DrawModes::EDGES_COLORED);
