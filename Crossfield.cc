@@ -367,7 +367,8 @@ Crossfield::getKappa(const int refEdgeMain, const int refEdgeNeigh, const std::p
 //        throw std::runtime_error("Something went wrong, there needs to be a ref edge in the main triangle!\n");
     }
     kappa = alpha + beta;
-    if (kappa <= -M_PI || kappa >= M_PI) {
+    if (kappa <= 0 || kappa >= 2 * M_PI) {
+        kappa = M_PI - kappa;
         throw std::runtime_error(
                 std::string("getKappa: kappa can't be bigger than ") + std::to_string(kappa * 180 / M_PI));
     }
