@@ -71,6 +71,7 @@ private:
     //store selected vertices
     std::vector<int> includedVertices;
     std::vector<int> includedHEdges;
+    std::map<int, int> dualSpanningTree;
 
 
 };

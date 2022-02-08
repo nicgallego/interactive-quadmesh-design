@@ -29,13 +29,13 @@ void MastersThesisPlugin::slot_get_boundary() {
         // different creation of mesh: TriMesh *trimesh = PluginFunctions::triMesh(*o_it);
 
         if (trimesh) {
-            DijkstraDistance mesh{*trimesh};
-            includedVertices = mesh.calculateDijkstra(refDist);
+            DijkstraDistance dijkDistMesh{*trimesh};
+            includedVertices = dijkDistMesh.calculateDijkstra(refDist);
             if (inclBoundaryF)
-                mesh.includeBoundaryFaces(includedVertices, refDist);
-            includedHEdges = mesh.getHEinRange(includedVertices, refDist, inclBoundaryF);
-            mesh.getDualGraphDijkstra(includedHEdges);
-            mesh.colorizeEdges(includedHEdges);
+                dijkDistMesh.includeBoundaryFaces(includedVertices, refDist);
+            includedHEdges = dijkDistMesh.getHEinRange(includedVertices, refDist, inclBoundaryF);
+            dualSpanningTree = dijkDistMesh.getDualGraphDijkstra(includedHEdges);
+            dijkDistMesh.colorizeEdges(includedHEdges);
             // change layer of display
             PluginFunctions::triMeshObject(*o_it)->meshNode()->drawMode(ACG::SceneGraph::DrawModes::EDGES_COLORED);
             emit updatedObject(o_it->id(), UPDATE_ALL);
