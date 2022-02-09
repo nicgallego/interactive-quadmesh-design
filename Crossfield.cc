@@ -101,22 +101,22 @@ Crossfield::getConstraintMatrix(const std::map<int, double> &edgeKappa, const st
     for (int i: constraintEdges) {
         // what if edge is between faces, do both faces get a 1 in their respective position in the row of the matrix
         OpenMesh::EdgeHandle eh = trimesh_.edge_handle(i);
-        OpenMesh::HalfedgeHandle hehCons = trimesh_.halfedge_handle(eh, 0);
-        if (trimesh_.is_boundary(hehCons)) {
-            hehCons = trimesh_.opposite_halfedge_handle(hehCons);
+        OpenMesh::HalfedgeHandle hehConst = trimesh_.halfedge_handle(eh, 0);
+        if (trimesh_.is_boundary(hehConst)) {
+            hehConst = trimesh_.opposite_halfedge_handle(hehConst);
         }
-        OpenMesh::FaceHandle fh = trimesh_.face_handle(hehCons);
+        OpenMesh::FaceHandle fh = trimesh_.face_handle(hehConst);
         double constraint = trimesh_.property(constraint_angle, fh);
         int position = trimesh_.property(pos_matrixA, fh);
         int idx = trimesh_.property(referenceHeIdx, fh);
         OpenMesh::HalfedgeHandle hehRef = trimesh_.halfedge_handle(idx);
         _constraints(counter, position) = 1.0;
 //        _constraints(counter, n_col) = constraint;
-        if (hehCons.idx() == hehRef.idx())
+        if (hehConst.idx() == hehRef.idx())
             _constraints(counter, n_col) = -1.0 * constraint;
-        if (hehCons.idx() == trimesh_.prev_halfedge_handle(hehRef).idx())
-            _constraints(counter, n_col) = -1.0 * trimesh_.calc_sector_angle(hehCons) + constraint;
-        if (hehCons.idx() == trimesh_.next_halfedge_handle(hehRef).idx())
+        if (hehConst.idx() == trimesh_.prev_halfedge_handle(hehRef).idx())
+            _constraints(counter, n_col) = -1.0 * trimesh_.calc_sector_angle(hehConst) + constraint;
+        if (hehConst.idx() == trimesh_.next_halfedge_handle(hehRef).idx())
             _constraints(counter, n_col) = -1.0 * trimesh_.calc_sector_angle(hehRef) + constraint;
         counter++;
     }

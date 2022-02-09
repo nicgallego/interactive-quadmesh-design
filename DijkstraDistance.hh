@@ -3,6 +3,7 @@
 
 #include <OpenMesh/Core/IO/MeshIO.hh>
 #include <OpenMesh/Core/Mesh/TriMesh_ArrayKernelT.hh>
+#include <OpenMesh/Core/Utils/PropertyManager.hh>
 #include <ObjectTypes/TriangleMesh/TriangleMesh.hh>
 #include <OpenFlipper/BasePlugin/BaseInterface.hh>
 #include <OpenFlipper/BasePlugin/PluginFunctions.hh>
@@ -18,11 +19,6 @@ public:
     using Point = ACG::Vec3d;
 public:
     DijkstraDistance(TriMesh &trimesh) : trimesh_{trimesh} {
-        // add properties to mesh and give them a name
-        trimesh_.add_property(edge_color, "edge_color");
-        trimesh_.add_property(distance, "dijkstra distance to starting point");
-        trimesh_.add_property(distanceBaryCenter, "used to calc dijkstra of dual graph");
-        trimesh_.add_property(origin_constraint, "origin Point of dual spanning tree");
     }
 
     ~DijkstraDistance() {
@@ -71,11 +67,6 @@ private:
     int getFaceWithSmallestDist(const std::vector<int> &faces);
 
     TriMesh &trimesh_;
-    // define properties
-    OpenMesh::EPropHandleT<TriMesh::Color> edge_color;
-    OpenMesh::VPropHandleT<double> distance;
-    OpenMesh::FPropHandleT<double> distanceBaryCenter;
-    OpenMesh::FPropHandleT<int> origin_constraint;
     std::vector<int> constraintVertices;
 };
 

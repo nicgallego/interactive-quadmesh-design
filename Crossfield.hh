@@ -6,7 +6,7 @@
 #define OPENFLIPPER_CROSSFIELD_HH
 
 #include <ObjectTypes/TriangleMesh/TriangleMesh.hh>
-#include <OpenMesh/Core/Utils/Property.hh>
+#include <OpenMesh/Core/Utils/PropertyManager.hh>
 #include <ObjectTypes/PolyMesh/PolyMesh.hh>
 #include <OpenMesh/Core/Mesh/PolyMesh_ArrayKernelT.hh>
 #include <OpenMesh/Core/IO/MeshIO.hh>
@@ -50,15 +50,6 @@ public:
     }
 
     ~Crossfield() {
-//        trimesh_.remove_property(face_color);
-//        trimesh_.remove_property(pos_matrixA);
-//        trimesh_.remove_property(barycenter);
-//        trimesh_.remove_property(referenceHeIdx);
-//        trimesh_.remove_property(x_vec_field);
-//        trimesh_.remove_property(y_vec_field);
-//        trimesh_.remove_property(x_vec_field_r);
-//        trimesh_.remove_property(y_vec_field_r);
-//        trimesh_.remove_property(theta);
     }
 
     void getCrossfield();
