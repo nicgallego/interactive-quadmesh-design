@@ -35,18 +35,6 @@ public:
      */
     Crossfield(TriMesh &trimesh, std::vector<int> &heInRange)
             : trimesh_{trimesh}, heInRange_{heInRange} {
-        trimesh_.add_property(theta, "angle to rotate");
-        trimesh_.add_property(face_color, "Face color");
-        trimesh_.add_property(constraint_angle, "angle constraint");
-        trimesh_.add_property(heh_color, "Halfedge");
-        trimesh_.add_property(xa, "x axis of local coord system");
-        trimesh_.add_property(ya, "y axis of local coord system");
-        trimesh_.add_property(x_vec_field, "x vector field");
-        trimesh_.add_property(y_vec_field, "y vector field");
-        trimesh_.add_property(x_vec_field_r, "x vector field rotated");
-        trimesh_.add_property(y_vec_field_r, "y vector field rotated");
-        trimesh_.add_property(pos_matrixA, "position matrix A");
-        trimesh_.add_property(referenceHeIdx, "ref he, x-axis local coord sys");
     }
 
     ~Crossfield() {
@@ -129,25 +117,9 @@ private:
 
     std::vector<int> getConstraintEdges(const std::vector<int> &constrainedHEdges);
 
-    void removeProperties();
-
 
     TriMesh &trimesh_;
     std::vector<int> &heInRange_;
-
-    OpenMesh::FPropHandleT<int> face_color;
-    OpenMesh::FPropHandleT<int> pos_matrixA;
-    OpenMesh::FPropHandleT<int> referenceHeIdx;
-    OpenMesh::FPropHandleT<double> constraint_angle;
-    OpenMesh::FPropHandleT<Point> xa;
-    OpenMesh::FPropHandleT<Point> ya;
-    OpenMesh::FPropHandleT<Point> x_vec_field;
-    OpenMesh::FPropHandleT<Point> y_vec_field;
-    OpenMesh::FPropHandleT<Point> x_vec_field_r;
-    OpenMesh::FPropHandleT<Point> y_vec_field_r;
-    OpenMesh::FPropHandleT<double> theta;
-    OpenMesh::HPropHandleT<int> heh_color;
-
 };
 
 
