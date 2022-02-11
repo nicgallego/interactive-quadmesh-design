@@ -56,6 +56,12 @@ private:
     getConstraintMatrix(const std::map<int, double> &edgeKappa, const std::vector<int> &constraintHalfEdges,
                         const std::vector<int> &faces);
 
+    void dualSpanningTreeConstraint(const std::map<int, double> &edgeKappa, int &counter, const int pj_start,
+                                    const std::vector<int> &noOriginConst,
+                                    gmm::row_matrix<gmm::wsvector<double>> &_constraints);
+
+    std::vector<int> getNumberOriginConstraints(const std::vector<int> &faces);
+
     std::vector<int> getIdxToRound(const std::map<int, double> &edgeKappa, const std::vector<int> &faces);
 
     std::vector<double> getRHS(const std::map<int, double> &edgeKappa, const std::vector<int> &faces);
@@ -74,7 +80,7 @@ private:
     gmm::col_matrix<gmm::wsvector<double>>
     getMatrixA(const std::vector<int> &faces, const std::map<int, double> &edgeKappa);
 
-    void renumberFace(OpenMesh::FaceHandle fh, int &counter);
+    void setPositionForFace(OpenMesh::FaceHandle fh, int &counter);
 
     std::map<int, double> getMapHeKappa(const std::vector<int> &faces);
 

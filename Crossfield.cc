@@ -28,8 +28,7 @@ void Crossfield::createCrossfields() {
     }
     std::cout << std::endl;
     for (std::size_t i = 0, max = _idx_to_round.size(); i != max; ++i) {
-        std::cout << "idx to round position (" << i << ") with value (before calc): " << _idx_to_round[i] << std::endl
-                  << std::endl;
+        std::cout << "idx to round position (" << i << ") with value (before calc): " << _idx_to_round[i] << std::endl;
     }
     std::cout << "Constraint matrix: " << gmm::mat_nrows(_constraints) <<
               " rows and " << gmm::mat_ncols(_constraints) << " columns:" << std::endl;
@@ -97,10 +96,11 @@ Crossfield::getConstraintMatrix(const std::map<int, double> &edgeKappa, const st
     auto pos_matrixA = OpenMesh::FProp<int>(trimesh_, "pos_matrixA");
     auto referenceHeIdx = OpenMesh::FProp<int>(trimesh_, "referenceHeIdx");
     //cNplusOne = angle between local coordinate x-axis and constraint
-    int cNplusOne = 1, counter = 0;
+    int cNplusOne = 1, counter = 0, pj_start = faces.size();
     // this results in have the rows of the constrainedhalfedges
-    std::vector<int> constraintEdges = getConstraintEdges(constraintHalfEdges);
-    int n_row = constraintEdges.size(), n_col = edgeKappa.size() + faces.size();
+    std::vector<int> constraintEdges = getConstraintEdges(
+            constraintHalfEdges), noOriginConst = getNumberOriginConstraints(faces);
+    int n_row = constraintEdges.size() + noOriginConst.size(), n_col = edgeKappa.size() + faces.size();
     gmm::row_matrix<gmm::wsvector<double>> _constraints(n_row, n_col + cNplusOne);
     for (int i: constraintEdges) {
         // what if edge is between faces, do both faces get a 1 in their respective position in the row of the matrix
@@ -115,7 +115,7 @@ Crossfield::getConstraintMatrix(const std::map<int, double> &edgeKappa, const st
         int idx = referenceHeIdx[fh];
         OpenMesh::HalfedgeHandle hehRef = trimesh_.halfedge_handle(idx);
         _constraints(counter, position) = 1.0;
-//        _constraints(counter, n_col) = constraint;
+        _constraints(counter, n_col) = constraint;
         if (hehConst.idx() == hehRef.idx())
             _constraints(counter, n_col) = -1.0 * constraint;
         if (hehConst.idx() == trimesh_.prev_halfedge_handle(hehRef).idx())
@@ -124,8 +124,50 @@ Crossfield::getConstraintMatrix(const std::map<int, double> &edgeKappa, const st
             _constraints(counter, n_col) = -1.0 * trimesh_.calc_sector_angle(hehRef) + constraint;
         counter++;
     }
+    dualSpanningTreeConstraint(edgeKappa, counter, pj_start, noOriginConst, _constraints);
+    if (counter != n_row) {
+        std::ostringstream oss;
+        oss << "getConstraintMatrix: amount of rows has to be the: " << n_row << " and not: " << counter << "\n";
+        throw std::runtime_error(oss.str());
+    }
     gmm::clean(_constraints, 1E-10);
     return _constraints;
+}
+
+void Crossfield::dualSpanningTreeConstraint(const std::map<int, double> &edgeKappa, int &counter, const int pj_start,
+                                            const std::vector<int> &noOriginConst,
+                                            gmm::row_matrix<gmm::wsvector<double>> &_constraints) {
+    auto origin_constraint = OpenMesh::FProp<int>(trimesh_, "origin_constraint");
+    int iteration = 0;
+    for (int i: noOriginConst) {
+        for (auto j: edgeKappa) {
+            OpenMesh::HalfedgeHandle heh = trimesh_.halfedge_handle(j.first);
+            OpenMesh::FaceHandle fh1 = trimesh_.face_handle(heh);
+            OpenMesh::FaceHandle fh2 = trimesh_.face_handle(trimesh_.opposite_halfedge_handle(heh));
+            double edge_weight = 1;
+//        edge_weight = ((trimesh_.calc_face_area(fh1) / 3) + (trimesh_.calc_face_area(fh2) / 3)) / totalArea;
+            int fh1_origin = origin_constraint[fh1];
+            int fh2_origin = origin_constraint[fh2];
+            if (fh1_origin == fh2_origin && fh1_origin == i) {
+                _constraints(counter, pj_start + iteration++) = 1;
+            } else {
+                _constraints(counter, pj_start + iteration++) = 0;
+            }
+        }
+        counter++;
+    }
+}
+
+std::vector<int> Crossfield::getNumberOriginConstraints(const std::vector<int> &faces) {
+    auto origin_constraint = OpenMesh::FProp<int>(trimesh_, "origin_constraint");
+    std::vector<int> noOrigins;
+    for (int i: faces) {
+        auto fh = trimesh_.face_handle(i);
+        if (std::find(noOrigins.begin(), noOrigins.end(), origin_constraint[fh]) == noOrigins.end()) {
+            noOrigins.push_back(origin_constraint[fh]);
+        }
+    }
+    return noOrigins;
 }
 
 std::vector<int> Crossfield::getConstraintEdges(const std::vector<int> &constrainedHEdges) {
@@ -239,11 +281,11 @@ Crossfield::getMatrixA(const std::vector<int> &faces, const std::map<int, double
         OpenMesh::HalfedgeHandle heh = trimesh_.halfedge_handle(i.first);
         OpenMesh::FaceHandle fh1 = trimesh_.face_handle(heh);
         OpenMesh::FaceHandle fh2 = trimesh_.face_handle(trimesh_.opposite_halfedge_handle(heh));
-        renumberFace(fh1, counter);
-        renumberFace(fh2, counter);
+        setPositionForFace(fh1, counter);
+        setPositionForFace(fh2, counter);
     }
     // fills up sparse column matrix _A
-    for (const auto &i: edgeKappa) {
+    for (auto i: edgeKappa) {
         OpenMesh::HalfedgeHandle heh = trimesh_.halfedge_handle(i.first);
         OpenMesh::FaceHandle fh1 = trimesh_.face_handle(heh);
         OpenMesh::FaceHandle fh2 = trimesh_.face_handle(trimesh_.opposite_halfedge_handle(heh));
@@ -255,22 +297,22 @@ Crossfield::getMatrixA(const std::vector<int> &faces, const std::map<int, double
         // | -2*w_ij    2*w_ij    -pi*w_ij |
         // | pi*w_ij  -pi*w_ij pi^2/2*w_ij |
         // added epsilon 0.1 to make the matrix positive definite, careful!
-        _A(pos_i, pos_i) = 2.0 * edge_weight + 0.1;
-        _A(pos_j, pos_j) = 2.0 * edge_weight + 0.1;
+        _A(pos_i, pos_i) = 2.0 * edge_weight;
+        _A(pos_j, pos_j) = 2.0 * edge_weight;
         _A(pos_i, pos_j) = -2.0 * edge_weight;
         _A(pos_j, pos_i) = -2.0 * edge_weight;
         _A(pos_i, pj_start + iteration) = M_PI * edge_weight;
         _A(pj_start + iteration, pos_i) = M_PI * edge_weight;
         _A(pos_j, pj_start + iteration) = -M_PI * edge_weight;
         _A(pj_start + iteration, pos_j) = -M_PI * edge_weight;
-        _A(pj_start + iteration, pj_start + iteration) = (pow(M_PI, 2) / 2) * edge_weight + 0.1;
+        _A(pj_start + iteration, pj_start + iteration) = (pow(M_PI, 2) / 2) * edge_weight;
         iteration++;
     }
     gmm::clean(_A, 1E-10);
     return _A;
 }
 
-void Crossfield::renumberFace(OpenMesh::FaceHandle fh, int &counter) {
+void Crossfield::setPositionForFace(OpenMesh::FaceHandle fh, int &counter) {
     auto pos_matrixA = OpenMesh::FProp<int>(trimesh_, "pos_matrixA");
     auto referenceHeIdx = OpenMesh::FProp<int>(trimesh_, "referenceHeIdx");
     if (!trimesh_.status(fh).tagged()) {
@@ -594,11 +636,11 @@ double Crossfield::getTotalArea(const std::vector<int> &faces) {
 void Crossfield::colorFaces(const std::vector<int> &faces) {
     auto face_color = OpenMesh::FProp<int>(trimesh_, "face_color");
     for (auto f_it = trimesh_.faces_begin(); f_it != trimesh_.faces_end(); ++f_it) {
-       face_color[*f_it] = 0;
+        face_color[*f_it] = 0;
     }
     for (int i: faces) {
         OpenMesh::FaceHandle fh = trimesh_.face_handle(i);
-       face_color[fh] = 1;
+        face_color[fh] = 1;
     }
 }
 
