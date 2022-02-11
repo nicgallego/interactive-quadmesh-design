@@ -120,7 +120,7 @@ void DijkstraDistance::initializeDistanceProperty() {
     std::vector<int> selectedFaces = MeshSelection::getFaceSelection(&trimesh_);
     auto distance = OpenMesh::VProp<double>(trimesh_, "distance");
     const double infiniteDistance = DBL_MAX;
-    const double zeroDistance = 0;
+    const double zeroDistance = 0.0;
 
     // give all vertices the property "distance" with infiniteDistance
     for (auto vh: trimesh_.vertices()) {
@@ -189,7 +189,7 @@ void DijkstraDistance::initializeSelectedFaces(std::vector<int> &selectedFaces, 
     }
 }
 
-std::map<int, int> DijkstraDistance::getDualGraphDijkstra(std::vector<int> &includedHEdges) {
+void DijkstraDistance::getDualGraphDijkstra(std::vector<int> &includedHEdges) {
     trimesh_.release_face_status();
     trimesh_.request_face_status();
     std::vector<int> constraintHEdges;
@@ -201,7 +201,7 @@ std::map<int, int> DijkstraDistance::getDualGraphDijkstra(std::vector<int> &incl
         throw std::runtime_error("getDualGraphDijkstra: constraintHEdges can't be empty!\n");
     }
     std::vector<int> faces = createFaceVector(constraintHEdges, includedHEdges);
-    return setDualGraphDijkstra(faces);
+    setDualGraphDijkstra(faces);
 }
 
 void DijkstraDistance::checkVOH(const OpenMesh::VertexHandle vh, std::vector<int> &constraintHEdges,
@@ -226,16 +226,20 @@ void DijkstraDistance::checkOccurrenceInVectors(const OpenMesh::SmartHalfedgeHan
 
 std::vector<int>
 DijkstraDistance::createFaceVector(const std::vector<int> constraintHEdges, const std::vector<int> &includedHEdges) {
+    auto origin_constraint = OpenMesh::FProp<int>(trimesh_, "origin_constraint");
     std::vector<int> faces;
     trimesh_.release_halfedge_status();
     trimesh_.release_face_status();
     // request to change the status
     trimesh_.request_halfedge_status();
     trimesh_.request_face_status();
+    for (TriMesh::FaceIter f_it = trimesh_.faces_begin(); f_it != trimesh_.faces_end(); ++f_it) {
+        origin_constraint[*f_it] = 0;
+    }
 
     // assign constraint edges to their faces
     for (int i: constraintHEdges) {
-        setFacesVecWithRefHe(i, faces);
+        setFacesVecWithRefHe(i, faces, constraintHEdges);
     }
 
     // assign reference edges in range to faces
@@ -246,28 +250,52 @@ DijkstraDistance::createFaceVector(const std::vector<int> constraintHEdges, cons
     return faces;
 }
 
-void DijkstraDistance::setFacesVecWithRefHe(const int i, std::vector<int> &faces) {
+void
+DijkstraDistance::setFacesVecWithRefHe(const int i, std::vector<int> &faces, const std::vector<int> constraintHEdges) {
     auto distanceBaryCenter = OpenMesh::FProp<double>(trimesh_, "distanceBaryCenter");
     auto origin_constraint = OpenMesh::FProp<int>(trimesh_, "origin_constraint");
-    OpenMesh::HalfedgeHandle heh = trimesh_.halfedge_handle(i);
-    if (trimesh_.is_boundary(heh)) {
-        heh = trimesh_.opposite_halfedge_handle(heh);
+    auto heh = trimesh_.halfedge_handle(i);
+    auto oheh = trimesh_.opposite_halfedge_handle(heh);
+    auto nheh = trimesh_.next_halfedge_handle(heh);
+    auto pheh = trimesh_.prev_halfedge_handle(heh);
+    auto onheh = trimesh_.next_halfedge_handle(oheh);
+    auto opheh = trimesh_.prev_halfedge_handle(oheh);
+    auto fh = trimesh_.face_handle(heh);
+    auto ofh = trimesh_.face_handle(oheh);
+    if (!trimesh_.is_boundary(heh) && !trimesh_.is_boundary(oheh) && !trimesh_.status(fh).tagged()) {
+        if ((std::find(constraintHEdges.begin(), constraintHEdges.end(), nheh.idx()) != constraintHEdges.end()) ||
+            (std::find(constraintHEdges.begin(), constraintHEdges.end(), pheh.idx()) != constraintHEdges.end())) {
+            addFaceToVector(fh, faces);
+        } else if (
+                (std::find(constraintHEdges.begin(), constraintHEdges.end(), onheh.idx()) != constraintHEdges.end()) ||
+                (std::find(constraintHEdges.begin(), constraintHEdges.end(), opheh.idx()) !=
+                 constraintHEdges.end())) {
+            addFaceToVector(ofh, faces);
+        } else {
+            addFaceToVector(fh, faces);
+            distanceBaryCenter[ofh] = DBL_MAX;
+            origin_constraint[ofh] = fh.idx();
+            trimesh_.status(ofh).set_tagged(true);
+        }
+    } else if (trimesh_.is_boundary(heh) && !trimesh_.status(ofh).tagged()) {
+        addFaceToVector(ofh, faces);
     }
-    OpenMesh::FaceHandle fh = trimesh_.face_handle(heh);
-    if (!trimesh_.status(heh).tagged() && !trimesh_.status(fh).tagged()) {
-        distanceBaryCenter[fh] = 0.0;
-        origin_constraint[fh] = fh.idx();
-        std::cout << "Face " << origin_constraint[fh] << " with Ref HEdge\n";
-        // set face and edge as used
-        trimesh_.status(heh).set_tagged(true);
-        trimesh_.status(fh).set_tagged(true);
-        faces.push_back(fh.idx());
-    }
+}
+
+void DijkstraDistance::addFaceToVector(const OpenMesh::FaceHandle fh, std::vector<int> &faces) {
+    auto distanceBaryCenter = OpenMesh::FProp<double>(trimesh_, "distanceBaryCenter");
+    auto origin_constraint = OpenMesh::FProp<int>(trimesh_, "origin_constraint");
+    distanceBaryCenter[fh] = 0.0;
+    origin_constraint[fh] = fh.idx();
+    std::cout << "Face " << origin_constraint[fh] << " with Ref HEdge\n";
+    trimesh_.status(fh).set_tagged(true);
+    faces.push_back(fh.idx());
 }
 
 void DijkstraDistance::setFacesVec(const int i, std::vector<int> &faces, const std::vector<int> &includedHEdges) {
     auto origin_constraint = OpenMesh::FProp<int>(trimesh_, "origin_constraint");
     auto distanceBaryCenter = OpenMesh::FProp<double>(trimesh_, "distanceBaryCenter");
+    auto heh_color = OpenMesh::HProp<int>(trimesh_, "heh_color");
     OpenMesh::HalfedgeHandle heh = trimesh_.halfedge_handle(i);
     if (trimesh_.is_boundary(heh))
         heh = trimesh_.opposite_halfedge_handle(heh);
@@ -281,6 +309,7 @@ void DijkstraDistance::setFacesVec(const int i, std::vector<int> &faces, const s
         distanceBaryCenter[fh] = DBL_MAX;
         origin_constraint[fh] = fh.idx();
         std::cout << "Face " << origin_constraint[fh] << " without Ref\n";
+        heh_color[heh] = 2;
         trimesh_.status(heh).set_tagged(true);
         trimesh_.status(trimesh_.opposite_halfedge_handle(heh)).set_tagged(true);
         trimesh_.status(fh).set_tagged(true);
@@ -288,21 +317,21 @@ void DijkstraDistance::setFacesVec(const int i, std::vector<int> &faces, const s
     }
 }
 
-std::map<int, int> DijkstraDistance::setDualGraphDijkstra(const std::vector<int> &faces) {
-    auto distanceBaryCenter = OpenMesh::FProp<double>(trimesh_, "distanceBaryCenter");
+void DijkstraDistance::setDualGraphDijkstra(const std::vector<int> &faces) {
     trimesh_.release_face_status();
     trimesh_.request_face_status();
+    auto distanceBaryCenter = OpenMesh::FProp<double>(trimesh_, "distanceBaryCenter");
     auto origin_constraint = OpenMesh::FProp<int>(trimesh_, "origin_constraint");
     std::map<int, int> dualSpanningTree;
     while (true) {
-        double distance = 0;
+        double distance = 0.0;
         int faceIdx = getFaceWithSmallestDist(faces);
         // if all vertices are visited the algo stops
         if (faceIdx == INT_MAX)
             break;
         OpenMesh::FaceHandle fh = trimesh_.face_handle(faceIdx);
         trimesh_.status(fh).set_tagged(true);
-        for (auto ff_it = trimesh_.ff_iter(fh); ff_it.is_valid(); ++ff_it) {
+        for (TriMesh::FaceFaceIter ff_it = trimesh_.ff_iter(fh); ff_it.is_valid(); ++ff_it) {
             if (!distanceBaryCenter[*ff_it] == 0) {
                 Point origin = trimesh_.calc_face_centroid(fh);
                 Point neighbour = trimesh_.calc_face_centroid(*ff_it);
@@ -312,16 +341,14 @@ std::map<int, int> DijkstraDistance::setDualGraphDijkstra(const std::vector<int>
                 if (!trimesh_.status(*ff_it).tagged()
                     && distance < distanceBaryCenter[*ff_it]) {
                     distanceBaryCenter[*ff_it] = distance;
-                    int preFaceIdx = origin_constraint[fh];
-                    origin_constraint[*ff_it] = preFaceIdx;
-                    dualSpanningTree[ff_it->idx()] = preFaceIdx;
+                    int prevFaceIdx = origin_constraint[fh];
+                    origin_constraint[*ff_it] = prevFaceIdx;
                     std::cout << "Face " << *ff_it << " with property " << origin_constraint[*ff_it]
                               << " and distance " << distanceBaryCenter[*ff_it] << std::endl;
                 }
             }
         }
     }
-    return dualSpanningTree;
 }
 
 int DijkstraDistance::getFaceWithSmallestDist(const std::vector<int> &faces) {

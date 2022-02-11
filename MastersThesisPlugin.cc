@@ -34,7 +34,7 @@ void MastersThesisPlugin::slot_get_boundary() {
             if (inclBoundaryF)
                 dijkDistMesh.includeBoundaryFaces(includedVertices, refDist);
             includedHEdges = dijkDistMesh.getHEinRange(includedVertices, refDist, inclBoundaryF);
-            dualSpanningTree = dijkDistMesh.getDualGraphDijkstra(includedHEdges);
+            dijkDistMesh.getDualGraphDijkstra(includedHEdges);
             dijkDistMesh.colorizeEdges(includedHEdges);
             // change layer of display
             PluginFunctions::triMeshObject(*o_it)->meshNode()->drawMode(ACG::SceneGraph::DrawModes::EDGES_COLORED);

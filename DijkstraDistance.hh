@@ -25,7 +25,7 @@ public:
     }
 
 public:
-    std::map<int, int> getDualGraphDijkstra(std::vector<int> &includedHEdges);
+    void getDualGraphDijkstra(std::vector<int> &includedHEdges);
 
     std::vector<int> calculateDijkstra(const double refDist);
 
@@ -58,11 +58,13 @@ private:
 
     std::vector<int> createFaceVector(const std::vector<int> constraintHEdges, const std::vector<int> &includedHEdges);
 
-    void setFacesVecWithRefHe(const int i, std::vector<int> &faces);
+    void setFacesVecWithRefHe(const int i, std::vector<int> &faces, const std::vector<int> constraintHEdges);
+
+    void addFaceToVector(const OpenMesh::FaceHandle fh, std::vector<int> &faces);
 
     void setFacesVec(const int i, std::vector<int> &faces, const std::vector<int> &includedHEdges);
 
-    std::map<int, int> setDualGraphDijkstra(const std::vector<int> &faces);
+    void setDualGraphDijkstra(const std::vector<int> &faces);
 
     int getFaceWithSmallestDist(const std::vector<int> &faces);
 
