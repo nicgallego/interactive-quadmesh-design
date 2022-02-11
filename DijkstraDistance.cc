@@ -234,7 +234,7 @@ DijkstraDistance::createFaceVector(const std::vector<int> constraintHEdges, cons
     trimesh_.request_halfedge_status();
     trimesh_.request_face_status();
     for (TriMesh::FaceIter f_it = trimesh_.faces_begin(); f_it != trimesh_.faces_end(); ++f_it) {
-        origin_constraint[*f_it] = 0;
+        origin_constraint[*f_it] = INT_MAX;
     }
 
     // assign constraint edges to their faces
@@ -287,7 +287,7 @@ void DijkstraDistance::addFaceToVector(const OpenMesh::FaceHandle fh, std::vecto
     auto origin_constraint = OpenMesh::FProp<int>(trimesh_, "origin_constraint");
     distanceBaryCenter[fh] = 0.0;
     origin_constraint[fh] = fh.idx();
-    std::cout << "Face " << origin_constraint[fh] << " with Ref HEdge\n";
+//    std::cout << "Face " << origin_constraint[fh] << " with Ref HEdge\n";
     trimesh_.status(fh).set_tagged(true);
     faces.push_back(fh.idx());
 }
@@ -308,7 +308,7 @@ void DijkstraDistance::setFacesVec(const int i, std::vector<int> &faces, const s
         // both halfedges need to be tagged, else it is possible opposite faces share an edge
         distanceBaryCenter[fh] = DBL_MAX;
         origin_constraint[fh] = fh.idx();
-        std::cout << "Face " << origin_constraint[fh] << " without Ref\n";
+//        std::cout << "Face " << origin_constraint[fh] << " without Ref\n";
         heh_color[heh] = 2;
         trimesh_.status(heh).set_tagged(true);
         trimesh_.status(trimesh_.opposite_halfedge_handle(heh)).set_tagged(true);
@@ -343,8 +343,8 @@ void DijkstraDistance::setDualGraphDijkstra(const std::vector<int> &faces) {
                     distanceBaryCenter[*ff_it] = distance;
                     int prevFaceIdx = origin_constraint[fh];
                     origin_constraint[*ff_it] = prevFaceIdx;
-                    std::cout << "Face " << *ff_it << " with property " << origin_constraint[*ff_it]
-                              << " and distance " << distanceBaryCenter[*ff_it] << std::endl;
+//                    std::cout << "Face " << *ff_it << " with property " << origin_constraint[*ff_it]
+//                              << " and distance " << distanceBaryCenter[*ff_it] << std::endl;
                 }
             }
         }
