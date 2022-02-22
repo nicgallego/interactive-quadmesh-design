@@ -105,9 +105,9 @@ private:
 
     std::vector<int> getReferenceEdge(const std::vector<int> &constrainedHEdges);
 
-    void setFacesVecWithRefHe(const int i, std::vector<int> &faces);
+    void setFacesVecWithRefHe(const int i, int &temp, std::vector<int> &faces);
 
-    void setFacesVec(const int i, std::vector<int> &faces);
+    void setFacesVec(const int i, int &temp, std::vector<int> &faces);
 
     std::vector<int> getConstraints();
 

@@ -197,9 +197,6 @@ void DijkstraDistance::getDualGraphDijkstra(std::vector<int> &includedHEdges) {
         auto vh = trimesh_.vertex_handle(i);
         checkVOH(vh, constraintHEdges, includedHEdges);
     }
-    if (constraintHEdges.empty()) {
-        throw std::runtime_error("getDualGraphDijkstra: constraintHEdges can't be empty!\n");
-    }
     std::vector<int> faces = createFaceVector(constraintHEdges, includedHEdges);
     setDualGraphDijkstra(faces);
 }
