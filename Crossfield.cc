@@ -68,6 +68,19 @@ void Crossfield::createCrossfields() {
     std::cout << "The energy before the smoothing is:\t" << energy_before << std::endl
               << "The energy after the smoothing is:\t" << energy_after << std::endl;
 
+    // test examples
+    const double tol = 1e-6;
+    int n = gmm::mat_nrows(_A);
+    CVectorType y(n), b(n);
+    gmm::copy(_x, y);
+    gmm::copy(_rhs, b);
+    double ea = computeEnergy(_A, y, b);
+    bool eb_ok = std::abs(ea - energy_after) < tol;
+//    assert(eb_ok);
+    if (!eb_ok) {
+        std::cerr << "the energies do not coincide: " << energy_after
+                  << " x^T A x + b^t x = " << ea << std::endl;
+    }
 }
 
 double Crossfield::getEnergy(const std::map<int, double> &edgeKappa, const std::vector<int> &faces,
@@ -353,6 +366,10 @@ void Crossfield::getStatusNeigh(const OpenMesh::FaceHandle fh, const OpenMesh::F
         // get the common edge between the triangles
         commonEdge = getCommonEdgeBetweenTriangles(fh, fh_neigh, refEdgeMain, refEdgeNeigh);
         kappa = getKappa(refEdgeMain, refEdgeNeigh, commonEdge);
+
+        // example test kappa
+        bool kappa_ok = testKappa(refEdgeMain, refEdgeNeigh, commonEdge);
+//        assert(kappa_ok);
         addKappaHeToMap(commonEdge, kappa, edgeKappa);
     }
 }
@@ -435,7 +452,7 @@ void Crossfield::addKappaHeToMap(const std::pair<int, int> commonEdge, const dou
     if (edgeKappa.find(commonEdge.second) == edgeKappa.end()) {
         int RefHEdgeIndex = commonEdge.first;
         std::cout << "RefHEdgeIndex: " << RefHEdgeIndex << " kappa: " << kappa * 180 / M_PI << std::endl << std::endl;
-        edgeKappa[RefHEdgeIndex] = kappa;
+        edgeKappa[RefHEdgeIndex] = kappa;        
     }
 }
 
